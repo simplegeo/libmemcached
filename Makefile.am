@@ -27,7 +27,7 @@ include libhashkit/include.am
 include example/include.am
 include support/include.am
 
-check-local: test-no-outputdiff
+#check-local: test-no-outputdiff
 
 
 fedora:
