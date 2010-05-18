@@ -1,0 +1,2953 @@
+Description: Upstream changes introduced in version 0.38-1
+ This patch has been created by dpkg-source during the package build.
+ Here's the last changelog entry, hopefully it gives details on why
+ those changes were made:
+ .
+ libmemcached (0.38-1) unstable; urgency=low
+ .
+   * New upstream release.
+   * Switch to dpkg-source 3.0 (quilt) format
+   * Skip the murmur test on hppa (Closes: #569194)
+   * Added spelling fix.
+ .
+ The person named in the Author field signed this changelog entry.
+Author: Monty Taylor <mordred@inaugust.com>
+Bug-Debian: http://bugs.debian.org/569194
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: <vendor|upstream|other>, <url of original patch>
+Bug: <url in upstream bugtracker>
+Bug-Debian: http://bugs.debian.org/<bugnumber>
+Forwarded: <no|not-needed|url proving that it has been forwarded>
+Reviewed-By: <name and email of someone who approved the patch>
+Last-Update: <YYYY-MM-DD>
+
+--- /dev/null
++++ libmemcached-0.38/tests/output_plus.res
+@@ -0,0 +1,5 @@
++servers localhost:11221,
++	localhost : 11221
++
++
++retvalue 1
+--- /dev/null
++++ libmemcached-0.38/tests/cpp_example.cc
+@@ -0,0 +1,194 @@
++/*
++ * An example file showing the usage of the C++ libmemcached interface.
++ */
++
++#include <vector>
++#include <string>
++#include <iostream>
++#include <algorithm>
++#include <map>
++
++#include <string.h>
++
++#include <libmemcached/memcached.hpp>
++
++using namespace std;
++using namespace memcache;
++
++class DeletePtrs
++{
++public:
++  template<typename T>
++  inline void operator()(const T *ptr) const
++  {
++    delete ptr;
++  }
++};
++
++class MyCache
++{
++public:
++
++  static const uint32_t num_of_clients= 10;
++
++  static MyCache &singleton()
++  {
++    static MyCache instance;
++    return instance;
++  }
++
++  void set(const string &key,
++           const vector<char> &value)
++  {
++    time_t expiry= 0;
++    uint32_t flags= 0;
++    getCache()->set(key, value, expiry, flags);
++  }
++
++  vector<char> get(const string &key)
++  {
++    vector<char> ret_value;
++    getCache()->get(key, ret_value);
++    return ret_value;
++  }
++
++  void remove(const string &key)
++  {
++    getCache()->remove(key);
++  }
++
++  Memcache *getCache()
++  {
++    /* 
++     * pick a random element from the vector of clients. Obviously, this is
++     * not very random but suffices as an example!
++     */
++    uint32_t index= rand() % num_of_clients;
++    return clients[index];
++  } 
++
++private:
++
++  /*
++   * A vector of clients.
++   */
++  std::vector<Memcache *> clients;
++
++  MyCache()
++    :
++      clients()
++  {
++    /* create clients and add them to the vector */
++    for (uint32_t i= 0; i < num_of_clients; i++)
++    {
++      Memcache *client= new Memcache("127.0.0.1:11211");
++      clients.push_back(client);
++    }
++  }
++
++  ~MyCache()
++  {
++    for_each(clients.begin(), clients.end(), DeletePtrs());
++    clients.clear();
++  }
++
++  MyCache(const MyCache&);
++
++};
++
++class Product
++{
++public:
++
++  Product(int in_id, double in_price)
++    :
++      id(in_id),
++      price(in_price)
++  {}
++
++  Product()
++    :
++      id(0),
++      price(0.0)
++  {}
++
++  int getId() const
++  {
++    return id;
++  }
++
++  double getPrice() const
++  {
++    return price;
++  }
++
++private:
++
++  int id;
++  double price;
++
++};
++
++void setAllProducts(vector<Product> &products)
++{
++  vector<char> raw_products(products.size() * sizeof(Product));
++  memcpy(&raw_products[0], &products[0], products.size() * sizeof(Product));
++  MyCache::singleton().set("AllProducts", raw_products);
++}
++
++vector<Product> getAllProducts()
++{
++  vector<char> raw_products = MyCache::singleton().get("AllProducts");
++  vector<Product> products(raw_products.size() / sizeof(Product));
++  memcpy(&products[0], &raw_products[0], raw_products.size());
++  return products;
++}
++
++Product getProduct(const string &key)
++{
++  vector<char> raw_product= MyCache::singleton().get(key);
++  Product ret;
++  if (! raw_product.empty())
++  {
++    memcpy(&ret, &raw_product[0], sizeof(Product));
++  }
++  else
++  {
++    /* retrieve it from the persistent store */
++  }
++  return ret;
++}
++
++void setProduct(const string &key, const Product &product)
++{
++  vector<char> raw_product(sizeof(Product));
++  memcpy(&raw_product[0], &product, sizeof(Product));
++  MyCache::singleton().set(key, raw_product);
++}
++
++int main()
++{
++  Memcache first_client("127.0.0.1:19191");
++  map< string, map<string, string> > my_stats;
++  first_client.getStats(my_stats);
++  
++  /*
++   * Iterate through the retrieved stats.
++   */
++  map< string, map<string, string> >::iterator it=
++    my_stats.begin();
++  while (it != my_stats.end())
++  {
++    cout << "working with server: " << (*it).first << endl;
++    map<string, string> serv_stats= (*it).second;
++    map<string, string>::iterator iter= serv_stats.begin();
++    while (iter != serv_stats.end())
++    {
++      cout << (*iter).first << ":" << (*iter).second << endl;
++      ++iter;
++    }
++    ++it;
++  }
++
++  return 0;
++}
+--- /dev/null
++++ libmemcached-0.38/docs/memcached_result_st.pod
+@@ -0,0 +1,115 @@
++=head1 NAME
++
++memcached_result_create, memcached_result_free,
++memcached_result_key_value, memcached_result_key_length,
++memcached_result_value, memcached_result_length,
++memcached_result_flags, memcached_result_cas - Work with memcached_result_st
++
++
++=head1 LIBRARY
++
++C Client Library for memcached (libmemcached, -lmemcached)
++
++=head1 SYNOPSIS
++
++  #include <memcached.h>
++
++  memcached_result_st *
++    memcached_result_create (memcached_st *ptr,
++                             memcached_result_st *result);
++
++  void memcached_result_free (memcached_result_st *result);
++
++  const char * memcached_result_key_value (memcached_result_st *result);
++
++  size_t memcached_result_key_length (const memcached_result_st *result);
++
++  const char *memcached_result_value (memcached_result_st *ptr);
++
++  size_t memcached_result_length (const memcached_result_st *ptr);
++
++  uint32_t memcached_result_flags (const memcached_result_st *result)
++
++  uint64_t memcached_result_cas (const memcached_result_st *result);
++
++  memcached_return_t
++    memcached_result_set_value (memcached_result_st *ptr,
++                                const char *value, size_t length)
++
++  void memcached_result_set_flags (memcached_result_st *ptr, uint32_t flags)
++
++  void memcached_result_set_expiration (memcached_result_st *ptr, time_t)
++
++=head1 DESCRIPTION
++
++libmemcached(3) can optionally return a memcached_result_st which acts as a
++result object. The result objects have added benefits over the character
++pointer returns in that they are forward compatible with new return items
++that future memcached servers may implement (the best current example of
++this is the CAS return item). The structures can also be reused which will
++save on calls to malloc(3). It is suggested that you use result objects over
++char * return functions.
++
++The structure of memcached_result_st has been encapsulated, you should not
++write code to directly access members of the structure.
++
++memcached_result_create() will either allocate memory for a
++memcached_result_st or will initialize a structure passed to it.
++
++memcached_result_free() will deallocate any memory attached to the
++structure. If the structure was also alloacted, it will deallocate it.
++
++memcached_result_key_value() returns the key value associated with the
++current result object.
++
++memcached_result_key_length() returns the key length associated with the
++current result object.
++
++memcached_result_value() returns the result value associated with the
++current result object.
++
++memcached_result_length() returns the result length associated with the
++current result object.
++
++memcached_result_flags() returns the flags associated with the
++current result object.
++
++memcached_result_cas() returns the cas associated with the
++current result object. This value will only be available if the server
++supports it.
++
++memcached_result_set_value() takes a byte array and a size and sets
++the result to this value. This function is used for trigger responses.
++
++void memcached_result_set_flags() takes a result structure and stores
++a new value for the flags field.
++
++void memcached_result_set_expiration(A) takes a result structure and stores
++a new value for the expiration field (this is only used by read through
++triggers).
++
++You may wish to avoid using memcached_result_create(3) with a
++stack based allocation. The most common issues related to ABI safety involve
++heap allocated structures.
++
++=head1 RETURN
++
++Varies, see particular functions. All structures must have
++memcached_result_free() called on them for cleanup purposes. Failure to
++do this will result in leaked memory.
++
++=head1 HOME
++
++To find out more information please check:
++L<https://launchpad.net/libmemcached>
++
++=head1 AUTHOR
++
++Brian Aker, E<lt>brian@tangent.orgE<gt>
++
++=head1 SEE ALSO
++
++memcached(1) libmemcached(3) memcached_strerror(3)
++
++=cut
++
+--- /dev/null
++++ libmemcached-0.38/config/autorun.sh
+@@ -0,0 +1,105 @@
++#!/bin/sh
++# Taken from lighthttpd server (BSD). Thanks Jan!
++# Run this to generate all the initial makefiles, etc.
++
++die() { echo "$@"; exit 1; }
++
++# --force means overwrite ltmain.sh script if it already exists 
++LIBTOOLIZE_FLAGS=" --automake --copy --force"
++# --add-missing instructs automake to install missing auxiliary files
++# and --force to overwrite them if they already exist
++AUTOMAKE_FLAGS="--add-missing --copy --force"
++ACLOCAL_FLAGS="-I m4"
++
++ARGV0=$0
++ARGS="$@"
++
++run() {
++	echo "$ARGV0: running \`$@' $ARGS"
++	$@ $ARGS
++}
++
++# Try to locate a program by using which, and verify that the file is an
++# executable
++locate_binary() {
++  for f in $@
++  do
++    file=`which $f 2>/dev/null | grep -v '^no '`
++    if test -n "$file" -a -x "$file"; then
++      echo $file
++      return 0
++    fi
++  done
++
++  echo "" 
++  return 1
++}
++
++
++if test -f config/pre_hook.sh
++then
++  . config/pre_hook.sh
++fi
++
++# We need to some file here for the m4_sinclude, even if it's just empty
++if test ! -f config/plugin.ac
++then
++  touch config/plugin.ac
++fi
++
++# Try to detect the supported binaries if the user didn't
++# override that by pushing the environment variable
++if test x$LIBTOOLIZE = x; then
++  LIBTOOLIZE=`locate_binary glibtoolize libtoolize-1.5 libtoolize`
++  if test x$LIBTOOLIZE = x; then
++    die "Did not find a supported libtoolize"
++  fi
++fi
++
++if test x$ACLOCAL = x; then
++  ACLOCAL=`locate_binary aclocal-1.11 aclocal-1.10 aclocal-1.9 aclocal19 aclocal`
++  if test x$ACLOCAL = x; then
++    die "Did not find a supported aclocal"
++  fi
++fi
++
++if test x$AUTOMAKE = x; then
++  AUTOMAKE=`locate_binary automake-1.11 automake-1.10 automake-1.9 automake19 automake`
++  if test x$AUTOMAKE = x; then
++    die "Did not find a supported automake"
++  fi
++fi
++
++if test x$AUTOCONF = x; then
++  AUTOCONF=`locate_binary autoconf-2.59 autoconf259 autoconf`
++  if test x$AUTOCONF = x; then
++    die "Did not find a supported autoconf"
++  fi
++fi
++
++if test x$AUTOHEADER = x; then
++  AUTOHEADER=`locate_binary autoheader-2.59 autoheader259 autoheader`
++  if test x$AUTOHEADER = x; then
++    die "Did not find a supported autoheader"
++  fi
++fi
++
++run $LIBTOOLIZE $LIBTOOLIZE_FLAGS || die "Can't execute libtoolize"
++run $ACLOCAL $ACLOCAL_FLAGS || die "Can't execute aclocal"
++run $AUTOHEADER || die "Can't execute autoheader"
++run $AUTOMAKE $AUTOMAKE_FLAGS  || die "Can't execute automake"
++run $AUTOCONF || die "Can't execute autoconf"
++
++if test -f config/post_hook.sh
++then
++  . config/post_hook.sh
++fi
++
++echo "---"
++echo "Configured with the following tools:"
++echo "  * `$LIBTOOLIZE --version | head -1`"
++echo "  * `$ACLOCAL --version | head -1`"
++echo "  * `$AUTOHEADER --version | head -1`"
++echo "  * `$AUTOMAKE --version | head -1`"
++echo "  * `$AUTOCONF --version | head -1`"
++echo "---"
+--- /dev/null
++++ libmemcached-0.38/m4/pkg.m4
+@@ -0,0 +1,157 @@
++# pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
++# 
++# Copyright © 2004 Scott James Remnant <scott@netsplit.com>.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful, but
++# WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++# General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++#
++# As a special exception to the GNU General Public License, if you
++# distribute this file as part of a program that contains a
++# configuration script generated by Autoconf, you may include it under
++# the same distribution terms that you use for the rest of that program.
++
++# PKG_PROG_PKG_CONFIG([MIN-VERSION])
++# ----------------------------------
++AC_DEFUN([PKG_PROG_PKG_CONFIG],
++[m4_pattern_forbid([^_?PKG_[A-Z_]+$])
++m4_pattern_allow([^PKG_CONFIG(_PATH)?$])
++AC_ARG_VAR([PKG_CONFIG], [path to pkg-config utility])dnl
++if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
++	AC_PATH_TOOL([PKG_CONFIG], [pkg-config])
++fi
++if test -n "$PKG_CONFIG"; then
++	_pkg_min_version=m4_default([$1], [0.9.0])
++	AC_MSG_CHECKING([pkg-config is at least version $_pkg_min_version])
++	if $PKG_CONFIG --atleast-pkgconfig-version $_pkg_min_version; then
++		AC_MSG_RESULT([yes])
++	else
++		AC_MSG_RESULT([no])
++		PKG_CONFIG=""
++	fi
++		
++fi[]dnl
++])# PKG_PROG_PKG_CONFIG
++
++# PKG_CHECK_EXISTS(MODULES, [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
++#
++# Check to see whether a particular set of modules exists.  Similar
++# to PKG_CHECK_MODULES(), but does not set variables or print errors.
++#
++#
++# Similar to PKG_CHECK_MODULES, make sure that the first instance of
++# this or PKG_CHECK_MODULES is called, or make sure to call
++# PKG_CHECK_EXISTS manually
++# --------------------------------------------------------------
++AC_DEFUN([PKG_CHECK_EXISTS],
++[AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
++if test -n "$PKG_CONFIG" && \
++    AC_RUN_LOG([$PKG_CONFIG --exists --print-errors "$1"]); then
++  m4_ifval([$2], [$2], [:])
++m4_ifvaln([$3], [else
++  $3])dnl
++fi])
++
++
++# _PKG_CONFIG([VARIABLE], [COMMAND], [MODULES])
++# ---------------------------------------------
++m4_define([_PKG_CONFIG],
++[if test -n "$PKG_CONFIG"; then
++    if test -n "$$1"; then
++        pkg_cv_[]$1="$$1"
++    else
++        PKG_CHECK_EXISTS([$3],
++                         [pkg_cv_[]$1=`$PKG_CONFIG --[]$2 "$3" 2>/dev/null`],
++			 [pkg_failed=yes])
++    fi
++else
++	pkg_failed=untried
++fi[]dnl
++])# _PKG_CONFIG
++
++# _PKG_SHORT_ERRORS_SUPPORTED
++# -----------------------------
++AC_DEFUN([_PKG_SHORT_ERRORS_SUPPORTED],
++[AC_REQUIRE([PKG_PROG_PKG_CONFIG])
++if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
++        _pkg_short_errors_supported=yes
++else
++        _pkg_short_errors_supported=no
++fi[]dnl
++])# _PKG_SHORT_ERRORS_SUPPORTED
++
++
++# PKG_CHECK_MODULES(VARIABLE-PREFIX, MODULES, [ACTION-IF-FOUND],
++# [ACTION-IF-NOT-FOUND])
++#
++#
++# Note that if there is a possibility the first call to
++# PKG_CHECK_MODULES might not happen, you should be sure to include an
++# explicit call to PKG_PROG_PKG_CONFIG in your configure.ac
++#
++#
++# --------------------------------------------------------------
++AC_DEFUN([PKG_CHECK_MODULES],
++[AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
++AC_ARG_VAR([$1][_CFLAGS], [C compiler flags for $1, overriding pkg-config])dnl
++AC_ARG_VAR([$1][_LIBS], [linker flags for $1, overriding pkg-config])dnl
++
++pkg_failed=no
++AC_MSG_CHECKING([for $1])
++
++_PKG_CONFIG([$1][_CFLAGS], [cflags], [$2])
++_PKG_CONFIG([$1][_LIBS], [libs], [$2])
++
++m4_define([_PKG_TEXT], [Alternatively, you may set the environment variables $1[]_CFLAGS
++and $1[]_LIBS to avoid the need to call pkg-config.
++See the pkg-config man page for more details.])
++
++if test $pkg_failed = yes; then
++        _PKG_SHORT_ERRORS_SUPPORTED
++        if test $_pkg_short_errors_supported = yes; then
++	        $1[]_PKG_ERRORS=`$PKG_CONFIG --short-errors --errors-to-stdout --print-errors "$2"`
++        else 
++	        $1[]_PKG_ERRORS=`$PKG_CONFIG --errors-to-stdout --print-errors "$2"`
++        fi
++	# Put the nasty error message in config.log where it belongs
++	echo "$$1[]_PKG_ERRORS" >&AS_MESSAGE_LOG_FD
++
++	ifelse([$4], , [AC_MSG_ERROR(dnl
++[Package requirements ($2) were not met:
++
++$$1_PKG_ERRORS
++
++Consider adjusting the PKG_CONFIG_PATH environment variable if you
++installed software in a non-standard prefix.
++
++_PKG_TEXT
++])],
++		[AC_MSG_RESULT([no])
++                $4])
++elif test $pkg_failed = untried; then
++	ifelse([$4], , [AC_MSG_FAILURE(dnl
++[The pkg-config script could not be found or is too old.  Make sure it
++is in your PATH or set the PKG_CONFIG environment variable to the full
++path to pkg-config.
++
++_PKG_TEXT
++
++To get pkg-config, see <http://pkg-config.freedesktop.org/>.])],
++		[$4])
++else
++	$1[]_CFLAGS=$pkg_cv_[]$1[]_CFLAGS
++	$1[]_LIBS=$pkg_cv_[]$1[]_LIBS
++        AC_MSG_RESULT([yes])
++	ifelse([$3], , :, [$3])
++fi[]dnl
++])# PKG_CHECK_MODULES
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_stl_hash.m4
+@@ -0,0 +1,110 @@
++# We check two things: where the include file is for hash_map, and
++# what namespace hash_map lives in within that include file.  We
++# include AC_COMPILE_IFELSE for all the combinations we've seen in the
++# wild.  We define one of HAVE_HASH_MAP or HAVE_EXT_HASH_MAP depending
++# on location, and HASH_NAMESPACE to be the namespace hash_map is
++# defined in.
++#
++# Ideally we'd use AC_CACHE_CHECK, but that only lets us store one value
++# at a time, and we need to store two (filename and namespace).
++# prints messages itself, so we have to do the message-printing ourselves
++# via AC_MSG_CHECKING + AC_MSG_RESULT.  (TODO(csilvers): can we cache?)
++
++AC_DEFUN([PANDORA_CXX_STL_HASH],
++  [AC_MSG_CHECKING(the location of hash_map)
++   save_CXXFLAGS="${CXXFLAGS}"
++   CXXFLAGS="${AM_CXXFLAGS} ${CXXFLAGS}"
++   AC_LANG_PUSH(C++)
++   ac_cv_cxx_hash_map=""
++   for location in "" "ext/" "tr1/" ; do
++     for namespace in __gnu_cxx "" std stdext; do
++       for classprefix in unordered hash; do
++         if test -z "$ac_cv_cxx_hash_map"; then
++           AC_COMPILE_IFELSE(
++             [AC_LANG_PROGRAM([[#include <${location}${classprefix}_map>]],
++                           [[${namespace}::${classprefix}_map<int, int> t]])],
++             [ac_cv_cxx_hash_map="<${location}${classprefix}_map>";
++              ac_cv_cxx_hash_set="<${location}${classprefix}_set>";
++              ac_cv_cxx_hash_namespace="$namespace";
++              ac_cv_cxx_hash_map_class="${classprefix}_map";
++              ac_cv_cxx_hash_set_class="${classprefix}_set"])
++
++         fi
++       done
++     done
++   done
++
++   if test -n "$ac_cv_cxx_hash_map"; then
++      AC_DEFINE(HAVE_HASH_MAP, 1, [define if the compiler has hash_map])
++      AC_DEFINE(HAVE_HASH_SET, 1, [define if the compiler has hash_set])
++      AC_DEFINE_UNQUOTED(HASH_MAP_H,$ac_cv_cxx_hash_map,
++                         [the location of <hash_map>])
++      AC_DEFINE_UNQUOTED(HASH_SET_H,$ac_cv_cxx_hash_set,
++                         [the location of <hash_set>])
++      AC_DEFINE_UNQUOTED(HASH_NAMESPACE,$ac_cv_cxx_hash_namespace,
++                         [the namespace of hash_map/hash_set])
++      AC_DEFINE_UNQUOTED(HASH_MAP_CLASS,$ac_cv_cxx_hash_map_class,
++                         [the classname of hash_map])
++      AC_DEFINE_UNQUOTED(HASH_SET_CLASS,$ac_cv_cxx_hash_set_class,
++                         [the classname of hash_set])
++      AC_MSG_RESULT([$ac_cv_cxx_hash_map])
++   else
++      AC_MSG_RESULT()
++      AC_MSG_WARN([could not find an STL hash_map])
++   fi
++   AC_CACHE_CHECK(
++     [whether hash_map has rehash method],
++     [ac_cv_hash_map_has_rehash],
++     [AC_COMPILE_IFELSE(
++       [AC_LANG_PROGRAM([[
++#include HASH_MAP_H
++using namespace HASH_NAMESPACE;
++       ]],[[
++HASH_MAP_CLASS<int, int> test_hash;
++test_hash.rehash(100);
++          ]])],
++       [ac_cv_hash_map_has_rehash=yes],
++       [ac_cv_hash_map_has_rehash=no])])
++   AS_IF([test $ac_cv_hash_map_has_rehash = yes],[
++      AC_DEFINE(HASH_MAP_HAS_REHASH, 1, [if hash_map<> hash rehash method])
++   ])
++   AC_CACHE_CHECK(
++     [whether hash_map has resize method],
++     [ac_cv_hash_map_has_resize],
++     [AC_COMPILE_IFELSE(
++       [AC_LANG_PROGRAM([[
++#include HASH_MAP_H
++using namespace HASH_NAMESPACE;
++       ]],[[
++HASH_MAP_CLASS<int, int> test_hash;
++test_hash.resize(100);
++          ]])],
++       [ac_cv_hash_map_has_resize=yes],
++       [ac_cv_hash_map_has_resize=no])])
++   AS_IF([test $ac_cv_hash_map_has_resize = yes],[
++      AC_DEFINE(HASH_MAP_HAS_RESIZE, 1, [if hash_map<> hash resize method])
++   ])
++   AC_CACHE_CHECK(
++     [whether to redefine hash<string>],
++     [ac_cv_redefine_hash_string],
++     [AC_COMPILE_IFELSE(
++       [AC_LANG_PROGRAM([[
++#include HASH_SET_H
++#include <string>
++using namespace HASH_NAMESPACE;
++using namespace std;
++          ]],[[
++string teststr("test");
++HASH_SET_CLASS<string> test_hash;
++HASH_SET_CLASS<string>::iterator iter= test_hash.find(teststr);
++if (iter != test_hash.end())
++  return 1;
++          ]])],
++       [ac_cv_redefine_hash_string=no],
++       [ac_cv_redefine_hash_string=yes])])
++   AS_IF([test $ac_cv_redefine_hash_string = yes],[
++      AC_DEFINE(REDEFINE_HASH_STRING, 1, [if hash<string> needs to be defined])
++   ])
++   CXXFLAGS="${save_CXXFLAGS}"
++   AC_LANG_POP()
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_run_cpplint.m4
+@@ -0,0 +1,8 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([PANDORA_RUN_CPPLINT],[
++  m4_syscmd([python config/make-lint.py])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libpq.m4
+@@ -0,0 +1,46 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBPQ],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libpq
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libpq],
++    [AS_HELP_STRING([--disable-libpq],
++      [Build with libpq support @<:@default=on@:>@])],
++    [ac_enable_libpq="$enableval"],
++    [ac_enable_libpq="yes"])
++
++  AS_IF([test "x$ac_enable_libpq" = "xyes"],[
++    AC_CHECK_HEADERS([libpq-fe.h])
++    AC_LIB_HAVE_LINKFLAGS(pq,,[
++      #ifdef HAVE_LIBPQ_FE_H
++      # include <libpq-fe.h>
++      #else
++      # include <postgresql/libpq-fe.h>
++      #endif
++    ], [
++      PGconn *conn;
++      conn = PQconnectdb(NULL);
++    ])
++  ],[
++    ac_cv_libpq="no"
++  ])
++  
++  AM_CONDITIONAL(HAVE_LIBPQ, [test "x${ac_cv_libpq}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBPQ],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBPQ])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBPQ],[
++  AC_REQUIRE([PANDORA_HAVE_LIBPQ])
++  AS_IF([test "x${ac_cv_libpq}" = "xno"],
++    AC_MSG_ERROR([libpq is required for ${PACKAGE}]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_lua.m4
+@@ -0,0 +1,55 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++AC_DEFUN([PANDORA_WITH_LUA],[
++    dnl Check for lua
++    AC_ARG_WITH([lua], 
++    [AS_HELP_STRING([--with-lua],
++      [Build Lua Bindings @<:@default=yes@:>@])],
++    [with_lua=$withval], 
++    [with_lua=yes])
++
++  AS_IF([test "x$with_lua" != "xno"],[
++    AS_IF([test "x$with_lua" = "xyes"],
++      [LUAPC=lua],
++      [LUAPC=$with_lua])
++
++    PKG_CHECK_MODULES([LUA], $LUAPC >= 5.1, [
++      AC_DEFINE([HAVE_LUA], [1], [liblua])
++      AC_DEFINE([HAVE_LUA_H], [1], [lua.h])
++      with_lua=yes
++    ],[
++      LUAPC=lua5.1
++      PKG_CHECK_MODULES([LUA], $LUAPC >= 5.1, [
++        AC_DEFINE([HAVE_LUA], [1], [liblua])
++        AC_DEFINE([HAVE_LUA_H], [1], [lua.h])
++        with_lua=yes
++      ],[
++        AC_DEFINE([HAVE_LUA],["x"],["x"])
++        with_lua=no
++      ])
++    ])
++
++    AC_CACHE_CHECK([for LUA installation location],[pandora_cv_lua_archdir],[
++      AS_IF([test "$prefix" = "NONE"],[
++        pandora_cv_lua_archdir=`${PKG_CONFIG} --define-variable=prefix=${ac_default_prefix} --variable=INSTALL_CMOD ${LUAPC}`
++      ],[
++        pandora_cv_lua_archdir=`${PKG_CONFIG} --define-variable=prefix=${prefix} --variable=INSTALL_CMOD ${LUAPC}`
++      ])
++    ])
++    LUA_ARCHDIR="${pandora_cv_lua_archdir}"
++    AC_SUBST(LUA_ARCHDIR)
++    AC_SUBST(LUA_CFLAGS)
++    AC_SUBST(LUA_LIBS)
++  ])
++  AM_CONDITIONAL(BUILD_LUA, test "$with_lua" = "yes")
++
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libgearman.m4
+@@ -0,0 +1,41 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBGEARMAN],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libgearman
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libgearman],
++    [AS_HELP_STRING([--disable-libgearman],
++      [Build with libgearman support @<:@default=on@:>@])],
++    [ac_enable_libgearman="$enableval"],
++    [ac_enable_libgearman="yes"])
++
++  AS_IF([test "x$ac_enable_libgearman" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(gearman,,[
++      #include <libgearman/gearman.h>
++    ],[
++      gearman_client_st gearman_client;
++      gearman_client_context(&gearman_client);
++    ])
++  ],[
++    ac_cv_libgearman="no"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBGEARMAN, [test "x${ac_cv_libgearman}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBGEARMAN],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBGEARMAN])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBGEARMAN],[
++  AC_REQUIRE([PANDORA_HAVE_LIBGEARMAN])
++  AS_IF([test "x${ac_cv_libgearman}" = "xno"],
++      AC_MSG_ERROR([At least version 0.10 of libgearman is required for ${PACKAGE}]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_protobuf.m4
+@@ -0,0 +1,80 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++dnl --------------------------------------------------------------------
++dnl  Check for Google Proto Buffers
++dnl --------------------------------------------------------------------
++
++AC_DEFUN([_PANDORA_SEARCH_LIBPROTOBUF],[
++  AC_REQUIRE([PANDORA_HAVE_PTHREAD])
++
++  AC_LANG_PUSH([C++])
++  save_CXXFLAGS="${CXXFLAGS}"
++  CXXFLAGS="${PTHREAD_CFLAGS} ${CXXFLAGS}"
++  AC_LIB_HAVE_LINKFLAGS(protobuf,,
++    [#include <google/protobuf/descriptor.h>],
++    [google::protobuf::FileDescriptor* file;],
++    [system])
++  CXXFLAGS="${save_CXXFLAGS}"
++  AC_LANG_POP()
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBPROTOBUF],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBPROTOBUF])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBPROTOBUF],[
++  AC_REQUIRE([PANDORA_HAVE_LIBPROTOBUF])
++  AS_IF([test x$ac_cv_libprotobuf = xno],
++      AC_MSG_ERROR([libprotobuf is required for ${PACKAGE}. On Debian this can be found in libprotobuf-dev. On RedHat this can be found in protobuf-devel.]))
++])
++
++AC_DEFUN([PANDORA_PROTOBUF_REQUIRE_VERSION],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBPROTOBUF])
++  p_recent_ver=$1
++  p_recent_ver_major=`echo $p_recent_ver | cut -f1 -d.`
++  p_recent_ver_minor=`echo $p_recent_ver | cut -f2 -d.`
++  p_recent_ver_patch=`echo $p_recent_ver | cut -f3 -d.`
++  p_recent_ver_hex=`printf "%d%03d%03d" $p_recent_ver_major $p_recent_ver_minor $p_recent_ver_patch` 
++  AC_LANG_PUSH([C++])
++  AC_CACHE_CHECK([for protobuf >= $p_recent_ver],
++    [drizzle_cv_protobuf_recent],
++    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++#include <google/protobuf/descriptor.h>
++#if GOOGLE_PROTOBUF_VERSION < $p_recent_ver_hex
++# error Your version of Protobuf is too old
++#endif
++      ]])],
++    [drizzle_cv_protobuf_recent=yes],
++    [drizzle_cv_protobuf_recent=no])])
++  AS_IF([test "$drizzle_cv_protobuf_recent" = "no"],[
++    AC_MSG_ERROR([Your version of Google Protocol Buffers is too old. ${PACKAGE} requires at least version $p_recent_ver])
++  ])
++  AC_LANG_POP()
++])
++
++AC_DEFUN([_PANDORA_SEARCH_PROTOC],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBPROTOBUF])
++  AC_PATH_PROG([PROTOC],[protoc],[no],[$LIBPROTOBUF_PREFIX/bin:$PATH])
++])
++
++AC_DEFUN([PANDORA_HAVE_PROTOC],[
++  AC_REQUIRE([_PANDORA_SEARCH_PROTOC])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_PROTOC],[
++  AC_REQUIRE([PANDORA_HAVE_PROTOC])
++  AS_IF([test "x$PROTOC" = "xno"],[
++    AC_MSG_ERROR([Couldn't find the protoc compiler. On Debian this can be found in protobuf-compiler. On RedHat this can be found in protobuf-compiler.])
++  ])
++])
++
++
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_python3_devel.m4
+@@ -0,0 +1,236 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl
++dnl   Copyright (C) 2009 Sun Microsystems, Inc.
++dnl   Copyright (c) 2008 Sebastian Huber <sebastian-huber@web.de>
++dnl   Copyright (c) 2008 Alan W. Irwin <irwin@beluga.phys.uvic.ca>
++dnl   Copyright (c) 2008 Rafael Laboissiere <rafael@laboissiere.net>
++dnl   Copyright (c) 2008 Andrew Collier <colliera@ukzn.ac.za>
++dnl   Copyright (c) 2008 Matteo Settenvini <matteo@member.fsf.org>
++dnl   Copyright (c) 2008 Horst Knorr <hk_classes@knoda.org>
++dnl
++dnl   This program is free software: you can redistribute it and/or modify it
++dnl   under the terms of the GNU General Public License as published by the
++dnl   Free Software Foundation, either version 3 of the License, or (at your
++dnl   option) any later version.
++dnl
++dnl   This program is distributed in the hope that it will be useful, but
++dnl   WITHOUT ANY WARRANTY; without even the implied warranty of
++dnl   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
++dnl   Public License for more details.
++dnl
++dnl   You should have received a copy of the GNU General Public License along
++dnl   with this program. If not, see <http://www.gnu.org/licenses/>.
++dnl
++dnl   As a special exception, the respective Autoconf Macro's copyright owner
++dnl   gives unlimited permission to copy, distribute and modify the configure
++dnl   scripts that are the output of Autoconf when processing the Macro. You
++dnl   need not follow the terms of the GNU General Public License when using
++dnl   or distributing such scripts, even though portions of the text of the
++dnl   Macro appear in them. The GNU General Public License (GPL) does govern
++dnl   all other use of the material that constitutes the Autoconf Macro.
++dnl
++dnl   This special exception to the GPL applies to versions of the Autoconf
++dnl   Macro released by the Autoconf Macro Archive. When you make and
++dnl   distribute a modified version of the Autoconf Macro, you may extend this
++dnl   special exception to the GPL to apply to your modified version as well.
++
++dnl SYNOPSIS
++dnl
++dnl   PANDORA_PYTHON3_DEVEL([version])
++dnl
++dnl DESCRIPTION
++dnl
++dnl   Note: Defines as a precious variable "PYTHON3_VERSION". Don't override it
++dnl   in your configure.ac.
++dnl
++dnl   This macro checks for Python and tries to get the include path to
++dnl   'Python.h'. It provides the $(PYTHON3_CPPFLAGS) and $(PYTHON3_LDFLAGS)
++dnl   output variables. It also exports $(PYTHON3_EXTRA_LIBS) and
++dnl   $(PYTHON3_EXTRA_LDFLAGS) for embedding Python in your code.
++dnl
++dnl   You can search for some particular version of Python by passing a
++dnl   parameter to this macro, for example ">= '2.3.1'", or "== '2.4'". Please
++dnl   note that you *have* to pass also an operator along with the version to
++dnl   match, and pay special attention to the single quotes surrounding the
++dnl   version number. Don't use "PYTHON3_VERSION" for this: that environment
++dnl   variable is declared as precious and thus reserved for the end-user.
++dnl
++dnl LAST MODIFICATION
++dnl
++dnl   2009-08-23
++
++AC_DEFUN([PANDORA_PYTHON3_DEVEL],[
++	#
++	# Allow the use of a (user set) custom python version
++	#
++	AC_ARG_VAR([PYTHON3_VERSION],[The installed Python
++		version to use, for example '3.0'. This string
++		will be appended to the Python interpreter
++		canonical name.])
++
++
++  AS_IF([test -z "$PYTHON3"],[
++  	AC_PATH_PROG([PYTHON3],[python[$PYTHON3_VERSION]])
++  ])
++	AS_IF([test -z "$PYTHON3"],[
++	  AC_MSG_ERROR([Cannot find python$PYTHON3_VERSION in your system path])
++	  PYTHON3_VERSION=""
++  ])
++
++	#
++	# if the macro parameter ``version'' is set, honour it
++	#
++	if test -n "$1"; then
++		AC_MSG_CHECKING([for a version of Python $1])
++		ac_supports_python3_ver=`$PYTHON3 -c "import sys, string; \
++			ver = string.split(sys.version)[[0]]; \
++			print(ver $1)"`
++		if test "$ac_supports_python3_ver" = "True"; then
++	   	   AC_MSG_RESULT([yes])
++		else
++			AC_MSG_RESULT([no])
++			AC_MSG_ERROR([this package requires Python $1.
++If you have it installed, but it isn't the default Python
++interpreter in your system path, please pass the PYTHON3_VERSION
++variable to configure. See ``configure --help'' for reference.
++])
++			PYTHON_VERSION=""
++		fi
++	fi
++
++	#
++	# Check if you have distutils, else fail
++	#
++	AC_MSG_CHECKING([for Python3 distutils package])
++	ac_python3_distutils_result=`$PYTHON3 -c "import distutils" 2>&1`
++	if test -z "$ac_python3_distutils_result"; then
++		AC_MSG_RESULT([yes])
++	else
++		AC_MSG_RESULT([no])
++		AC_MSG_ERROR([cannot import Python3 module "distutils".
++Please check your Python3 installation. The error was:
++$ac_python3_distutils_result])
++		PYTHON3_VERSION=""
++	fi
++
++	#
++	# Check for Python include path
++	#
++	AC_MSG_CHECKING([for Python3 include path])
++	if test -z "$PYTHON3_CPPFLAGS"; then
++		python3_path=`$PYTHON3 -c "import distutils.sysconfig; \
++           		print(distutils.sysconfig.get_python_inc());"`
++		if test -n "${python3_path}"; then
++		   	python3_path="-I$python3_path"
++		fi
++		PYTHON3_CPPFLAGS=$python3_path
++	fi
++	AC_MSG_RESULT([$PYTHON3_CPPFLAGS])
++	AC_SUBST([PYTHON3_CPPFLAGS])
++
++	#
++	# Check for Python library path
++	#
++	AC_MSG_CHECKING([for Python3 library path])
++	if test -z "$PYTHON3_LDFLAGS"; then
++		# (makes two attempts to ensure we've got a version number
++		# from the interpreter)
++		py3_version=`$PYTHON3 -c "from distutils.sysconfig import *; \
++			print(' '.join(get_config_vars('VERSION')))"`
++		if test "$py3_version" == "[None]"; then
++			if test -n "$PYTHON3_VERSION"; then
++				py3_version=$PYTHON3_VERSION
++			else
++				py3_version=`$PYTHON3 -c "import sys; \
++					print(sys.version[[:3]])"`
++			fi
++		fi
++
++		PYTHON3_LDFLAGS=`$PYTHON3 -c "from distutils.sysconfig import *; \
++			print('-L' + get_python_lib(0,1), \
++		      	'-lpython');"`$py3_version
++	fi
++	AC_MSG_RESULT([$PYTHON3_LDFLAGS])
++	AC_SUBST([PYTHON3_LDFLAGS])
++
++	#
++	# Check for site packages
++	#
++	AC_MSG_CHECKING([for Python3 site-packages path])
++	if test -z "$PYTHON3_SITE_PKG"; then
++		PYTHON3_SITE_PKG=`$PYTHON3 -c "import distutils.sysconfig; \
++		        print(distutils.sysconfig.get_python_lib(0,0));"`
++	fi
++	AC_MSG_RESULT([$PYTHON3_SITE_PKG])
++	AC_SUBST([PYTHON3_SITE_PKG])
++
++	#
++	# libraries which must be linked in when embedding
++	#
++	AC_MSG_CHECKING(for Python3 embedding libraries)
++	if test -z "$PYTHON3_EMBED_LIBS"; then
++	   PYTHON3_EMBED_LIBS=`$PYTHON3 -c "import distutils.sysconfig; \
++                conf = distutils.sysconfig.get_config_var; \
++                print(conf('LOCALMODLIBS'), conf('LIBS'))"`
++	fi
++	AC_MSG_RESULT([$PYTHON3_EMBED_LIBS])
++	AC_SUBST(PYTHON3_EMBED_LIBS)
++
++	#
++	# linking flags needed when embedding
++	#
++	AC_MSG_CHECKING(for Python3 embedding linking flags)
++	if test -z "$PYTHON3_EMBED_LDFLAGS"; then
++		PYTHON3_EMBED_LDFLAGS=`$PYTHON3 -c "import distutils.sysconfig; \
++			conf = distutils.sysconfig.get_config_var; \
++			print(conf('LINKFORSHARED'))"`
++	fi
++	AC_MSG_RESULT([$PYTHON3_EMBED_LDFLAGS])
++	AC_SUBST(PYTHON3_EMBED_LDFLAGS)
++
++	#
++	# final check to see if everything compiles alright
++	#
++	AC_MSG_CHECKING([for Python3 development environment consistency])
++	AC_LANG_PUSH([C])
++	# save current global flags
++  ac_save_LIBS="$LIBS"
++  ac_save_CPPFLAGS="$CPPFLAGS"
++	LIBS="$ac_save_LIBS $PYTHON3_LDFLAGS"
++	CPPFLAGS="$ac_save_CPPFLAGS $PYTHON3_CPPFLAGS"
++	AC_TRY_LINK([
++		#include <Python.h>
++	],[
++		Py_Initialize();
++	],[python3exists=yes],[python3exists=no])
++
++	AC_MSG_RESULT([$python3exists])
++
++        if test ! "$python3exists" = "yes"; then
++	   AC_MSG_WARN([
++  Could not link test program to Python3.
++  Maybe the main Python3 library has been installed in some non-standard
++  library path. If so, pass it to configure, via the LDFLAGS environment
++  variable.
++  Example: ./configure LDFLAGS="-L/usr/non-standard-path/python3/lib"
++  ============================================================================
++   ERROR!
++   You probably have to install the development version of the Python3 package
++   for your distribution.  The exact name of this package varies among them.
++  ============================================================================
++	   ])
++	  PYTHON3_VERSION=""
++	fi
++	AC_LANG_POP
++	# turn back to default flags
++	CPPFLAGS="$ac_save_CPPFLAGS"
++	LIBS="$ac_save_LIBS"
++
++	#
++	# all done!
++	#
++])
++
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_plugins.m4
+@@ -0,0 +1,53 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl--------------------------------------------------------------------
++dnl PANDORA_PLUGINS
++dnl Declare our plugin modules
++dnl--------------------------------------------------------------------
++
++AC_DEFUN([PANDORA_PLUGINS],[
++
++  dnl We do this to prime the files from a fresh checkout. Normally we want
++  dnl these commands to be executed by make. Perhaps we should split them into
++  dnl a few shell script snippets in config and make Make call them... we're
++  dnl going to get there...
++  dnl ANYWAY - syscmd gets called during aclocal - so before automake. It will
++  dnl get called probably during autoconf too, so it's important to protect
++  dnl with test -f ... if the files exist, we don't have the chicken/egg 
++  dnl problem and therefore don't need to do anything here
++  m4_syscmd([python config/pandora-plugin > /dev/null])
++  m4_syscmd([test -f config/plugin.stamp || touch config/plugin.stamp aclocal.m4])
++
++  m4_sinclude(config/pandora-plugin.ac)
++
++  dnl Add code here to read set plugin lists and  set drizzled_default_plugin_list
++  pandora_builtin_list=`echo $pandora_builtin_list | sed 's/, *$//'`
++  AS_IF([test "x$pandora_builtin_list" = "x"], pandora_builtin_list="NULL")
++  AC_SUBST([PANDORA_BUILTIN_LIST],[$pandora_builtin_list])
++  AC_SUBST([PANDORA_PLUGIN_LIST],[$pandora_default_plugin_list])
++  m4_ifval(m4_normalize([$1]),[
++    AC_CONFIG_FILES($*)
++    ],[
++    AC_DEFINE_UNQUOTED([PANDORA_BUILTIN_LIST],[$pandora_builtin_list],
++                       [List of plugins to be built in])
++    AC_DEFINE_UNQUOTED([PANDORA_PLUGIN_LIST],["$pandora_default_plugin_list"],
++                       [List of plugins that should be loaded on startup if no
++                        value is given for --plugin-load])
++  ])
++
++
++  AC_SUBST(pandora_plugin_test_list)
++  AC_SUBST(pandora_plugin_libs)
++
++  pandora_plugin_defs=`echo $pandora_plugin_defs | sed 's/, *$//'`
++  AC_SUBST(pandora_plugin_defs)
++
++  AC_SUBST(PANDORA_PLUGIN_DEP_LIBS)
++  AC_SUBST(pkgplugindir,"\$(pkglibdir)/plugin")
++])
++
++AC_DEFUN([PANDORA_ADD_PLUGIN_DEP_LIB],[
++  PANDORA_PLUGIN_DEP_LIBS="${PANDORA_PLUGIN_DEP_LIBS} $*"
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_r.m4
+@@ -0,0 +1,33 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++AC_DEFUN([PANDORA_WITH_R],[
++    dnl Check for GNU R
++    AC_ARG_WITH([r], 
++    [AS_HELP_STRING([--with-r],
++      [Build R Bindings @<:@default=yes@:>@])],
++    [with_r=$withval], 
++    [with_r=yes])
++
++  AS_IF([test "x$with_r" != "xno"],[
++
++    PKG_CHECK_MODULES([R], [libR], [
++      with_r=yes
++    ],[
++      with_r=no
++    ])
++
++   AC_SUBST(R_CFLAGS)
++   AC_SUBST(R_LIBS)
++  ])
++  AM_CONDITIONAL(BUILD_R, test "$with_r" = "yes")
++
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_gettext.m4
+@@ -0,0 +1,41 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++AC_DEFUN([PANDORA_WITH_GETTEXT],[
++
++  m4_syscmd([if test -d po ; then
++    echo "# This file is auto-generated from configure. Do not edit directly" > po/POTFILES.in.stamp
++    PACKAGE=`grep ^AC_INIT configure.ac | cut -f2-3 -d[ | cut -f1 -d]`
++    for f in `find . | grep -v "${PACKAGE}-" | egrep '\.(cc|c|h|yy)$' | cut -c3- | sort`
++    do
++      if grep gettext.h "$f" | grep include >/dev/null 2>&1
++      then
++        echo "$f" >> po/POTFILES.in.stamp
++      fi
++    done
++    if diff po/POTFILES.in.stamp po/POTFILES.in >/dev/null 2>&1
++    then
++      rm po/POTFILES.in.stamp
++    else
++      mv po/POTFILES.in.stamp po/POTFILES.in
++    fi
++  fi])
++
++  AM_GNU_GETTEXT(external, need-formatstring-macros)
++  AM_GNU_GETTEXT_VERSION([0.17])
++  AS_IF([test "x$MSGMERGE" = "x" -o "x$MSGMERGE" = "x:"],[
++    AM_PATH_PROG_WITH_TEST(GMSGMERGE, gmsgmerge,
++      [$ac_dir/$ac_word --update -q /dev/null /dev/null >&]AS_MESSAGE_LOG_FD[ 2>&1], :)
++    MSGMERGE="${GMSGMERGE}"
++  ])
++  AM_CONDITIONAL([BUILD_GETTEXT],[test "x$MSGMERGE" != "x" -a "x$MSGMERGE" != "x:"])
++
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_perl.m4
+@@ -0,0 +1,81 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++
++AC_DEFUN([PANDORA_WITH_PERL], [
++
++  AC_ARG_WITH([perl], 
++    [AS_HELP_STRING([--with-perl],
++      [Build Perl Bindings @<:@default=yes@:>@])],
++    [with_perl=$withval], 
++    [with_perl=yes])
++
++  AC_ARG_WITH([perl-arch],
++    [AS_HELP_STRING([--with-perl-arch],
++      [Install Perl bindings into system location @<:@default=no@:>@])],
++    [with_perl_arch=$withval],
++    [with_perl_arch=no])
++
++  AS_IF([test "x$with_perl" != "xno"],[
++    AS_IF([test "x$with_perl" != "xyes"],
++      [ac_chk_perl=$with_perl],
++      [ac_chk_perl=perl])
++    AC_CHECK_PROGS(PERL,$ac_chk_perl)
++  ])
++  AS_IF([test "x$PERL" != "x"],[
++    AC_CACHE_CHECK([for Perl include path],[pandora_cv_perl_include],[
++      pandora_cv_perl_include=`$PERL -MConfig -e 'print $Config{archlib};'`
++      pandora_cv_perl_include="${pandora_cv_perl_include}/CORE"
++    ])
++    AC_CACHE_CHECK([for Perl CPPFLAGS],[pandora_cv_perl_cppflags],[
++      pandora_cv_perl_cppflags=`$PERL -MConfig -e 'print $Config{cppflags};'`
++      pandora_cv_perl_cppflags="${pandora_cv_perl_cppflags}"
++    ])
++    PERL_CPPFLAGS="-I${pandora_cv_perl_include} ${pandora_cv_perl_cppflags}"
++
++    AC_CACHE_CHECK([for Perl development headers],
++      [pandora_cv_perl_dev],[
++        
++        save_CPPFLAGS="${CPPFLAGS}"
++        CPPFLAGS="${CPPFLAGS} ${PERL_CPPFLAGS}"
++        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++#include <math.h>
++#include <stdlib.h>
++#include "EXTERN.h"
++#include "perl.h"
++#include "XSUB.h"
++        ]])],
++        [pandora_cv_perl_dev=yes],
++        [pandora_cv_perl_dev=no])
++        CPPFLAGS="${save_CPPFLAGS}"
++      ])
++
++    AS_IF([test "${pandora_cv_perl_dev}" = "no"],
++      [with_perl=no])
++
++    AC_CACHE_CHECK([for Perl install location],
++      [pandora_cv_perl_archdir],[
++        AS_IF([test "${with_perl_arch}" = "no"],[
++          pandora_cv_perl_archdir=`$PERL -MConfig -e 'print $Config{sitearch}'`
++        ],[
++          pandora_cv_perl_archdir=`$PERL -MConfig -e 'print $Config{archlib}'`
++        ])
++        pandora_cv_perl_archdir="${pandora_cv_perl_archdir}"
++    ])
++ 
++    PERL_ARCHDIR="${pandora_cv_perl_archdir}"
++  ])
++  AC_SUBST([PERL_CPPFLAGS])
++  AC_SUBST([PERL_ARCHDIR])
++
++  AM_CONDITIONAL(BUILD_PERL, [test "$with_perl" != "no"])
++
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_php.m4
+@@ -0,0 +1,56 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++
++AC_DEFUN([PANDORA_WITH_PHP],[
++
++  AC_ARG_WITH([php],
++    [AS_HELP_STRING([--with-php],
++      [Build NDB/PHP @<:@default=no@:>@])],
++    [with_php=$withval],
++    [with_php=no])
++
++  AS_IF([test "x$with_php" != "xno"],[
++    dnl We explicitly requested PHP build. Fail on too-young SWIG.
++    AS_IF([test "x$SWIG_CAN_BUILD_PHP" != "xyes"],
++      [AC_MSG_ERROR("Your version of SWIG is too young to build NDB/PHP. >=1.3.33 is required!")])
++    AS_IF([test "x$with_php" != "xyes"],
++      [ac_check_php_config=$with_php],
++      [ac_check_php_config="php-config php-config5"])
++      AC_CHECK_PROGS(PHP_CONFIG, [$ac_check_php_config])
++    ])
++
++  AS_IF([test "x$PHP_CONFIG" != "x"],[
++    PHP_CFLAGS=`$PHP_CONFIG --includes`
++    PHP_CPPFLAGS=`$PHP_CONFIG --includes`
++    PHP_LDFLAGS=`$PHP_CONFIG --ldflags`
++    PHP_EXTDIR=`$PHP_CONFIG --extension-dir`
++    strip_php_prefix=`$PHP_CONFIG --prefix | sed 's/\//./g'`
++    PHP_ARCH_DIR=`echo $PHP_EXTDIR | sed "s/$strip_php_prefix//"`
++  ],[
++    PHP_CFLAGS=
++    PHP_CPPFLAGS=
++    PHP_LDFLAGS=
++    PHP_EXTDIR=
++    PHP_ARCH_DIR=
++    with_php=no
++  ])
++
++  AC_SUBST(PHP_CFLAGS)
++  AC_SUBST(PHP_CPPFLAGS)
++  AC_SUBST(PHP_LDFLAGS)
++  AC_SUBST(PHP_EXTDIR)
++  AC_SUBST(PHP_ARCH_DIR)
++
++  AM_CONDITIONAL(BUILD_PHP, test "$with_php" = "yes")
++  
++])
++
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libmemcached.m4
+@@ -0,0 +1,62 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBMEMCACHED],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libmemcached
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libmemcached],
++    [AS_HELP_STRING([--disable-libmemcached],
++      [Build with libmemcached support @<:@default=on@:>@])],
++    [ac_enable_libmemcached="$enableval"],
++    [ac_enable_libmemcached="yes"])
++
++  AS_IF([test "x$ac_enable_libmemcached" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(memcached,,[
++      #include <libmemcached/memcached.h>
++    ],[
++      memcached_st memc;
++      memcached_dump_func *df;
++      memcached_lib_version();
++    ])
++    AC_LIB_HAVE_LINKFLAGS(memcachedprotocol,,[
++      #include <libmemcached/protocol_handler.h>
++    ],[
++      struct memcached_protocol_st *protocol_handle;
++      protocol_handle= memcached_protocol_create_instance();
++    ])
++  ],[
++    ac_cv_libmemcached="no"
++  ])
++  
++  AC_CACHE_CHECK([if libmemcached has memcached_server_fn],
++    [pandora_cv_libmemcached_server_fn],
++    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++#include <libmemcached/memcached.h>
++memcached_server_fn callbacks[1];
++    ]])],
++    [pandora_cv_libmemcached_server_fn=yes],
++    [pandora_cv_libmemcached_server_fn=no])])
++  AS_IF([test "x$pandora_cv_libmemcached_server_fn" = "xyes"],[
++    AC_DEFINE([HAVE_MEMCACHED_SERVER_FN],[1],[If we have the new memcached_server_fn typedef])
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBMEMCACHED, [test "x${ac_cv_libmemcached}" = "xyes"])
++  
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBMEMCACHED],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBMEMCACHED])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBMEMCACHED],[
++  AC_REQUIRE([PANDORA_HAVE_LIBMEMCACHED])
++  AS_IF([test x$ac_cv_libmemcached = xno],
++      AC_MSG_ERROR([libmemcached is required for ${PACKAGE}]))
++])
++
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libavahi.m4
+@@ -0,0 +1,41 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBAVAHI],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libavahi
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libavahi],
++    [AS_HELP_STRING([--disable-libavahi],
++      [Build with libavahi support @<:@default=on@:>@])],
++    [ac_enable_libavahi="$enableval"],
++    [ac_enable_libavahi="yes"])
++
++  AS_IF([test "x$ac_enable_libavahi" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(avahi-client,avahi-common,[
++      #include <avahi-client/client.h>
++      #include <avahi-common/simple-watch.h>
++    ],[
++      AvahiSimplePoll *simple_poll= avahi_simple_poll_new();
++    ])
++  ],[
++    ac_cv_libavahi="no"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBAVAHI, [test "x${ac_cv_libavahi}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBAVAHI],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBAVAHI])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBAVAHI],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBAVAHI])
++  AS_IF([test "x${ac_cv_libavahi}" = "xno"],
++    AC_MSG_ERROR([libavahi is required for ${PACKAGE}]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libuuid.m4
+@@ -0,0 +1,55 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++#--------------------------------------------------------------------
++# Check for libuuid
++#--------------------------------------------------------------------
++
++
++AC_DEFUN([_PANDORA_SEARCH_LIBUUID],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl Do this by hand. Need to check for uuid/uuid.h, but uuid may or may
++  dnl not be a lib is weird.
++  AC_CHECK_HEADERS(uuid/uuid.h)
++  AC_LIB_HAVE_LINKFLAGS(uuid,,
++  [
++    #include <uuid/uuid.h>
++  ],
++  [
++    uuid_t uout;
++    uuid_generate(uout);
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBUUID, [test "x${ac_cv_libuuid}" = "xyes"])
++])
++
++AC_DEFUN([_PANDORA_HAVE_LIBUUID],[
++
++  AC_ARG_ENABLE([libuuid],
++    [AS_HELP_STRING([--disable-libuuid],
++      [Build with libuuid support @<:@default=on@:>@])],
++    [ac_enable_libuuid="$enableval"],
++    [ac_enable_libuuid="yes"])
++
++  _PANDORA_SEARCH_LIBUUID
++])
++
++
++AC_DEFUN([PANDORA_HAVE_LIBUUID],[
++  AC_REQUIRE([_PANDORA_HAVE_LIBUUID])
++])
++
++AC_DEFUN([_PANDORA_REQUIRE_LIBUUID],[
++  ac_enable_libuuid="yes"
++  _PANDORA_SEARCH_LIBUUID
++  AS_IF([test "x$ac_cv_header_uuid_uuid_h" = "xno"],[
++    AC_MSG_ERROR([Couldn't find uuid/uuid.h. On Debian this can be found in uuid-dev. On Redhat this can be found in e2fsprogs-devel.])
++  ])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBUUID],[
++  AC_REQUIRE([_PANDORA_REQUIRE_LIBUUID])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libxml2.m4
+@@ -0,0 +1,52 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++ 
++dnl Provides support for finding libxml2.
++dnl LIBXML2_CFLAGS will be set, in addition to LIBXML2 and LTLIBXML2
++
++AC_DEFUN([_PANDORA_SEARCH_LIBXML2],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libxml2
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libxml2],
++    [AS_HELP_STRING([--disable-libxml2],
++      [Build with libxml2 support @<:@default=on@:>@])],
++    [ac_enable_libxml2="$enableval"],
++    [ac_enable_libxml2="yes"])
++
++  AS_IF([test "x$ac_enable_libxml2" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(xml2,,[
++#include <libxml/xmlversion.h>
++    ],[
++const char *test= LIBXML_DOTTED_VERSION;
++    ])
++  ],[
++    ac_cv_libxml2="no"
++  ])
++
++  AS_IF([test "${ac_cv_libxml2}" = "no" -a "${ac_enable_libxml2}" = "yes"],[
++
++    PKG_CHECK_MODULES([LIBXML2], [libxml-2.0], [
++      ac_cv_libxml2=yes
++      LTLIBXML2=${LIBXML2_LIBS}
++      LIBXML2=${LIBXML2_LIBS}
++    ],[])
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBXML2, [test "${ac_cv_libxml2}" = "yes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBXML2],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBXML2])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBXML2],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBXML2])
++  AS_IF([test "x${ac_cv_libxml2}" = "xno"],
++    AC_MSG_ERROR([libxml2 is required for ${PACKAGE}. On Debian systems this is found in libxml2-dev. On RedHat, libxml2-devel.]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_sasl.m4
+@@ -0,0 +1,133 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_SASL],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for sasl
++  dnl --------------------------------------------------------------------
++  AC_ARG_ENABLE([sasl],
++    [AS_HELP_STRING([--disable-sasl],
++      [Build with sasl support @<:@default=on@:>@])],
++    [ac_enable_sasl="$enableval"],
++    [ac_enable_sasl="yes"])
++
++  AS_IF([test "x$ac_enable_sasl" = "xyes"],
++    [
++      AC_LIB_HAVE_LINKFLAGS(sasl,,[
++        #include <stdlib.h>
++        #include <sasl/sasl.h>
++      ],[
++        sasl_server_init(NULL, NULL);
++      ])
++
++      AS_IF([test "x${ac_cv_libsasl}" != "xyes" ],
++            [
++              AC_LIB_HAVE_LINKFLAGS(sasl2,,[
++                #include <stdlib.h>
++                #include <sasl/sasl.h>
++              ],[
++                sasl_server_init(NULL, NULL);
++              ])
++              HAVE_LIBSASL="$HAVE_LIBSASL2"
++              LIBSASL="$LIBSASL2"
++              LIBSASL_PREFIX="$LIBSASL2_PREFIX"
++	      LTLIBSASL="$LT_LIBSASL2"
++            ])
++    ])
++
++  AS_IF([test "x${ac_cv_libsasl}" = "xyes" -o "x${ac_cv_libsasl2}" = "xyes"],
++        [ac_cv_sasl=yes],
++        [ac_cv_sasl=no])
++
++  AM_CONDITIONAL(HAVE_LIBSASL, [test "x${ac_cv_libsasl}" = "xyes"])
++  AM_CONDITIONAL(HAVE_LIBSASL2, [test "x${ac_cv_libsasl2}" = "xyes"])
++  AM_CONDITIONAL(HAVE_SASL, [test "x${ac_cv_sasl}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_SASL],[
++  AC_REQUIRE([_PANDORA_SEARCH_SASL])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_SASL],[
++  AC_REQUIRE([_PANDORA_SEARCH_SASL])
++  AS_IF([test "x${ac_cv_sasl}" = "xno"],
++    AC_MSG_ERROR([SASL (libsasl or libsasl2) is required for ${PACKAGE}]))
++])
++
++AC_DEFUN([_PANDORA_SEARCH_LIBSASL],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libsasl
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libsasl],
++    [AS_HELP_STRING([--disable-libsasl],
++      [Build with libsasl support @<:@default=on@:>@])],
++    [ac_enable_libsasl="$enableval"],
++    [ac_enable_libsasl="yes"])
++
++  AS_IF([test "x$ac_enable_libsasl" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(sasl,,[
++      #include <stdlib.h>
++      #include <sasl/sasl.h>
++    ],[
++      sasl_server_init(NULL, NULL);
++    ])
++  ],[
++    ac_cv_libsasl="no"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBSASL, [test "x${ac_cv_libsasl}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBSASL],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBSASL])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBSASL],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBSASL])
++  AS_IF([test "x${ac_cv_libsasl}" = "xno"],
++    AC_MSG_ERROR([libsasl is required for ${PACKAGE}]))
++])
++
++AC_DEFUN([_PANDORA_SEARCH_LIBSASL2],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libsasl2
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libsasl2],
++    [AS_HELP_STRING([--disable-libsasl2],
++      [Build with libsasl2 support @<:@default=on@:>@])],
++    [ac_enable_libsasl2="$enableval"],
++    [ac_enable_libsasl2="yes"])
++
++  AS_IF([test "x$ac_enable_libsasl2" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(sasl2,,[
++      #include <stdlib.h>
++      #include <sasl2/sasl2.h>
++    ],[
++      sasl2_server_init(NULL, NULL);
++    ])
++  ],[
++    ac_cv_libsasl2="no"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBSASL2, [test "x${ac_cv_libsasl2}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBSASL2],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBSASL2])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBSASL2],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBSASL2])
++  AS_IF([test "x${ac_cv_libsasl2}" = "xno"],
++    AC_MSG_ERROR([libsasl2 is required for ${PACKAGE}]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libreadline.m4
+@@ -0,0 +1,242 @@
++#
++# SYNOPSIS
++#
++#   PANDORA_HAVE_LIBREADLINE
++#
++# DESCRIPTION
++#
++#   Searches for a readline compatible library. If found, defines
++#   `HAVE_LIBREADLINE'. If the found library has the `add_history'
++#   function, sets also `HAVE_READLINE_HISTORY'. Also checks for the
++#   locations of the necessary include files and sets `HAVE_READLINE_H'
++#   or `HAVE_READLINE_READLINE_H' and `HAVE_READLINE_HISTORY_H' or
++#   'HAVE_HISTORY_H' if the corresponding include files exists.
++#
++#   The libraries that may be readline compatible are `libedit',
++#   `libeditline' and `libreadline'. Sometimes we need to link a
++#   termcap library for readline to work, this macro tests these cases
++#   too by trying to link with `libtermcap', `libcurses' or
++#   `libncurses' before giving up.
++#
++#   Here is an example of how to use the information provided by this
++#   macro to perform the necessary includes or declarations in a C
++#   file:
++#
++#     #ifdef HAVE_LIBREADLINE
++#     #  if defined(HAVE_READLINE_READLINE_H)
++#     #    include <readline/readline.h>
++#     #  elif defined(HAVE_READLINE_H)
++#     #    include <readline.h>
++#     #  else /* !defined(HAVE_READLINE_H) */
++#     extern char *readline ();
++#     #  endif /* !defined(HAVE_READLINE_H) */
++#     char *cmdline = NULL;
++#     #else /* !defined(HAVE_READLINE_READLINE_H) */
++#       /* no readline */
++#     #endif /* HAVE_LIBREADLINE */
++#
++#     #ifdef HAVE_READLINE_HISTORY
++#     #  if defined(HAVE_READLINE_HISTORY_H)
++#     #    include <readline/history.h>
++#     #  elif defined(HAVE_HISTORY_H)
++#     #    include <history.h>
++#     #  else /* !defined(HAVE_HISTORY_H) */
++#     extern void add_history ();
++#     extern int write_history ();
++#     extern int read_history ();
++#     #  endif /* defined(HAVE_READLINE_HISTORY_H) */
++#       /* no history */
++#     #endif /* HAVE_READLINE_HISTORY */
++#
++# LAST MODIFICATION
++#
++#   2009-11-17
++#
++# Based on VL_LIB_READLINE from  Ville Laurikari
++#
++# COPYLEFT
++#
++#   Copyright (c) 2009 Monty Taylor
++#   Copyright (c) 2002 Ville Laurikari <vl@iki.fi>
++#
++#   Copying and distribution of this file, with or without
++#   modification, are permitted in any medium without royalty provided
++#   the copyright notice and this notice are preserved.
++
++AC_DEFUN([PANDORA_CHECK_TIOCGWINSZ],[
++  AC_CACHE_CHECK([for TIOCGWINSZ in sys/ioctl.h],
++    [pandora_cv_tiocgwinsz_in_ioctl],[
++    AC_COMPILE_IFELSE([
++      AC_LANG_PROGRAM([[
++#include <sys/types.h>
++#include <sys/ioctl.h>
++      ]],[[
++int x= TIOCGWINSZ;
++      ]])
++    ],[
++      pandora_cv_tiocgwinsz_in_ioctl=yes
++    ],[
++      pandora_cv_tiocgwinsz_in_ioctl=no
++    ])
++  ])
++  AS_IF([test "$pandora_cv_tiocgwinsz_in_ioctl" = "yes"],[   
++    AC_DEFINE([GWINSZ_IN_SYS_IOCTL], [1],
++              [READLINE: your system defines TIOCGWINSZ in sys/ioctl.h.])
++  ])
++])
++
++AC_DEFUN([PANDORA_CHECK_RL_COMPENTRY], [
++  AC_CACHE_CHECK([defined rl_compentry_func_t], [pandora_cv_rl_compentry],[
++    AC_COMPILE_IFELSE([
++      AC_LANG_PROGRAM([[
++#include "stdio.h"
++#include "readline/readline.h"
++      ]],[[
++rl_compentry_func_t *func2= (rl_compentry_func_t*)0;
++      ]])
++    ],[
++      pandora_cv_rl_compentry=yes
++    ],[
++      pandora_cv_rl_compentry=no
++    ])
++  ])
++  AS_IF([test "$pandora_cv_rl_compentry" = "yes"],[
++    AC_DEFINE([HAVE_RL_COMPENTRY], [1],
++              [Does system provide rl_compentry_func_t])
++  ])
++
++  save_CXXFLAGS="${CXXFLAGS}"
++  CXXFLAGS="${AM_CXXFLAGS} ${CXXFLAGS}"
++  AC_LANG_PUSH(C++)
++  AC_CACHE_CHECK([rl_compentry_func_t works], [pandora_cv_rl_compentry_works],[
++    AC_COMPILE_IFELSE([
++      AC_LANG_PROGRAM([[
++#include "stdio.h"
++#include "readline/readline.h"
++      ]],[[
++rl_completion_entry_function= (rl_compentry_func_t*)NULL;
++      ]])
++    ],[
++      pandora_cv_rl_compentry_works=yes
++    ],[
++      pandora_cv_rl_compentry_works=no
++    ])
++  ])
++  AS_IF([test "$pandora_cv_rl_compentry_works" = "yes"],[
++    AC_DEFINE([HAVE_WORKING_RL_COMPENTRY], [1],
++              [Does system provide an rl_compentry_func_t that is usable])
++  ])
++  CXXFLAGS="${save_CXXFLAGS}"
++  AC_LANG_POP()
++])
++
++
++AC_DEFUN([PANDORA_CHECK_RL_COMPLETION_FUNC], [
++  AC_CACHE_CHECK([defined rl_completion_func_t], [pandora_cv_rl_completion],[
++    AC_COMPILE_IFELSE([
++      AC_LANG_PROGRAM([[
++#include "stdio.h"
++#include "readline/readline.h"
++      ]],[[
++rl_completion_func_t *func1= (rl_completion_func_t*)0;
++      ]])
++    ],[
++      pandora_cv_rl_completion=yes
++    ],[
++      pandora_cv_rl_completion=no
++    ])
++  ])
++  AS_IF([test "$pandora_cv_rl_completion" = "yes"],[
++    AC_DEFINE([HAVE_RL_COMPLETION], [1],
++              [Does system provide rl_completion_func_t])
++  ])
++])
++
++AC_DEFUN([_PANDORA_SEARCH_LIBREADLINE], [
++
++  save_LIBS="${LIBS}"
++  LIBS=""
++
++  AC_CACHE_CHECK([for a readline compatible library],
++                 ac_cv_libreadline, [
++    ORIG_LIBS="$LIBS"
++    for readline_lib in readline edit editline; do
++      for termcap_lib in "" termcap curses ncurses; do
++        if test -z "$termcap_lib"; then
++          TRY_LIB="-l$readline_lib"
++        else
++          TRY_LIB="-l$readline_lib -l$termcap_lib"
++        fi
++        LIBS="$ORIG_LIBS $TRY_LIB"
++        AC_TRY_LINK_FUNC(readline, ac_cv_libreadline="$TRY_LIB")
++        if test -n "$ac_cv_libreadline"; then
++          break
++        fi
++      done
++      if test -n "$ac_cv_libreadline"; then
++        break
++      fi
++    done
++    if test -z "$ac_cv_libreadline"; then
++      ac_cv_libreadline="no"
++      LIBS="$ORIG_LIBS"
++    fi
++  ])
++
++  if test "$ac_cv_libreadline" != "no"; then
++    AC_DEFINE(HAVE_LIBREADLINE, 1,
++              [Define if you have a readline compatible library])
++    AC_CHECK_HEADERS(readline.h readline/readline.h)
++    AC_CACHE_CHECK([whether readline supports history],
++                   ac_cv_libreadline_history, [
++      ac_cv_libreadline_history="no"
++      AC_TRY_LINK_FUNC(add_history, ac_cv_libreadline_history="yes")
++    ])
++    if test "$ac_cv_libreadline_history" = "yes"; then
++      AC_DEFINE(HAVE_READLINE_HISTORY, 1,
++                [Define if your readline library has \`add_history'])
++      AC_CHECK_HEADERS(history.h readline/history.h)
++    fi
++  fi
++  PANDORA_CHECK_RL_COMPENTRY  
++  PANDORA_CHECK_RL_COMPLETION_FUNC
++  PANDORA_CHECK_TIOCGWINSZ
++
++
++  READLINE_LIBS="${LIBS}"
++  LIBS="${save_LIBS}"
++  AC_SUBST(READLINE_LIBS)
++
++  AM_CONDITIONAL(HAVE_LIBREADLINE, [test "x${ac_cv_libreadline}" = "xyes"])
++])
++
++AC_DEFUN([_PANDORA_HAVE_LIBREADLINE],[
++
++  AC_ARG_ENABLE([libreadline],
++    [AS_HELP_STRING([--disable-libreadline],
++      [Build with libreadline support @<:@default=on@:>@])],
++    [ac_enable_libreadline="$enableval"],
++    [ac_enable_libreadline="yes"])
++
++  _PANDORA_SEARCH_LIBREADLINE
++])
++
++
++AC_DEFUN([PANDORA_HAVE_LIBREADLINE],[
++  AC_REQUIRE([_PANDORA_HAVE_LIBREADLINE])
++])
++
++AC_DEFUN([_PANDORA_REQUIRE_LIBREADLINE],[
++  ac_enable_libreadline="yes"
++  _PANDORA_SEARCH_LIBREADLINE
++
++  AS_IF([test "x$ac_cv_libreadline" = "xno"],
++    AC_MSG_ERROR([libreadline is required for ${PACKAGE}. On Debian this can be found in libreadline5-dev. On RedHat this can be found in readline-devel.]))
++
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBREADLINE],[
++  AC_REQUIRE([_PANDORA_REQUIRE_LIBREADLINE])
++])
++
++
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_swig.m4
+@@ -0,0 +1,39 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystem
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++AC_DEFUN([PANDORA_SWIG],[
++
++  AC_PROG_SWIG(1.3.31)
++  
++  AC_DEFINE_UNQUOTED([SWIG_TYPE_TABLE],
++    [$PACKAGE],
++    [Type Table name for SWIG symbol table])
++
++  dnl Have to hard-code /usr/local/include and /usr/include into the path.
++  dnl I hate this. Why is swig sucking me
++  SWIG="$SWIG \${DEFS} -I\${top_srcdir} -I\${top_builddir} -I/usr/local/include -I/usr/include"
++  AC_SUBST([SWIG])
++
++
++])
++
++AC_DEFUN([PANDORA_SWIG_PYTHON3],[
++  AC_REQUIRE([PANDORA_SWIG])
++  AS_IF([test "x$SWIG" != "x"],[
++    AC_CACHE_CHECK([if swig supports Python3],
++      [ac_cv_swig_has_python3_],
++      [
++        AS_IF([$SWIG -python -help 2>&1 | grep py3 > /dev/null],
++          [ac_cv_swig_has_python3_=yes],
++          [ac_cv_swig_has_python3_=no])
++      ])
++  ])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libz.m4
+@@ -0,0 +1,51 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++#--------------------------------------------------------------------
++# Check for libz
++#--------------------------------------------------------------------
++
++
++AC_DEFUN([_PANDORA_SEARCH_LIBZ],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  AC_LIB_HAVE_LINKFLAGS(z,,
++  [
++    #include <zlib.h>
++  ],[
++    crc32(0, Z_NULL, 0);
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBZ, [test "x${ac_cv_libz}" = "xyes"])
++])
++
++AC_DEFUN([_PANDORA_HAVE_LIBZ],[
++
++  AC_ARG_ENABLE([libz],
++    [AS_HELP_STRING([--disable-libz],
++      [Build with libz support @<:@default=on@:>@])],
++    [ac_enable_libz="$enableval"],
++    [ac_enable_libz="yes"])
++
++  _PANDORA_SEARCH_LIBZ
++])
++
++
++AC_DEFUN([PANDORA_HAVE_LIBZ],[
++  AC_REQUIRE([_PANDORA_HAVE_LIBZ])
++])
++
++AC_DEFUN([_PANDORA_REQUIRE_LIBZ],[
++  ac_enable_libz="yes"
++  _PANDORA_SEARCH_LIBZ
++
++  AS_IF([test x$ac_cv_libz = xno],[
++    AC_MSG_ERROR([libz is required for ${PACKAGE}. On Debian this can be found in zlib1g-dev. On RedHat this can be found in zlib-devel.])
++  ])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBZ],[
++  AC_REQUIRE([_PANDORA_REQUIRE_LIBZ])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libdl.m4
+@@ -0,0 +1,51 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++#--------------------------------------------------------------------
++# Check for libdl
++#--------------------------------------------------------------------
++
++
++AC_DEFUN([_PANDORA_SEARCH_LIBDL],[
++
++  save_LIBS="$LIBS"
++  LIBS=""
++  AC_CHECK_LIB(dl,dlopen)
++  AC_CHECK_FUNCS(dlopen)
++  LIBDL_LIBS="$LIBS"
++  LIBS="${save_LIBS}"
++  AC_SUBST(LIBDL_LIBS)
++
++  AM_CONDITIONAL(HAVE_LIBDL, [test "x${ac_cv_func_dlopen}" = "xyes"])
++])
++
++AC_DEFUN([_PANDORA_HAVE_LIBDL],[
++
++  AC_ARG_ENABLE([libdl],
++    [AS_HELP_STRING([--disable-libdl],
++      [Build with libdl support @<:@default=on@:>@])],
++    [ac_enable_libdl="$enableval"],
++    [ac_enable_libdl="yes"])
++
++  _PANDORA_SEARCH_LIBDL
++])
++
++
++AC_DEFUN([PANDORA_HAVE_LIBDL],[
++  AC_REQUIRE([_PANDORA_HAVE_LIBDL])
++])
++
++AC_DEFUN([_PANDORA_REQUIRE_LIBDL],[
++  ac_enable_libdl="yes"
++  _PANDORA_SEARCH_LIBDL
++
++  AS_IF([test "$ac_cv_func_dlopen" != "yes"],[
++    AC_MSG_ERROR([libdl/dlopen() is required for ${PACKAGE}. On Debian this can be found in libc6-dev. On RedHat this can be found in glibc-devel.])
++  ])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBDL],[
++  AC_REQUIRE([_PANDORA_REQUIRE_LIBDL])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_cinttypes.m4
+@@ -0,0 +1,34 @@
++# We check two things: where the include file is for cinttypes. We
++# include AC_TRY_COMPILE for all the combinations we've seen in the
++# wild.  We define one of HAVE_CINTTYPES or HAVE_TR1_CINTTYPES or 
++# HAVE_BOOST_CINTTYPES depending
++# on location.
++
++AC_DEFUN([PANDORA_CXX_CINTTYPES],
++  [AC_REQUIRE([PANDORA_CXX_CSTDINT])
++   AC_MSG_CHECKING(the location of cinttypes)
++   AC_LANG_PUSH(C++)
++   save_CXXFLAGS="${CXXFLAGS}"
++   CXXFLAGS="${CXX_STANDARD} ${CXXFLAGS}"
++   ac_cv_cxx_cinttypes=""
++   for location in tr1/cinttypes boost/cinttypes cinttypes; do
++     if test -z "$ac_cv_cxx_cinttypes"; then
++       AC_TRY_COMPILE([#include $ac_cv_cxx_cstdint;
++                       #include <$location>],
++                      [uint32_t foo= UINT32_C(1)],
++                      [ac_cv_cxx_cinttypes="<$location>";])
++     fi
++   done
++   AC_LANG_POP()
++   CXXFLAGS="${save_CXXFLAGS}"
++   if test -n "$ac_cv_cxx_cinttypes"; then
++      AC_MSG_RESULT([$ac_cv_cxx_cinttypes])
++   else
++      ac_cv_cxx_cinttypes="<inttypes.h>"
++      AC_MSG_RESULT()
++      AC_MSG_WARN([Could not find a cinttypes header.])
++   fi
++   AC_DEFINE([__STDC_LIMIT_MACROS],[1],[Use STDC Limit Macros in C++])
++   AC_DEFINE_UNQUOTED(CINTTYPES_H,$ac_cv_cxx_cinttypes,
++                      [the location of <cinttypes>])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_python3.m4
+@@ -0,0 +1,44 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++AC_DEFUN([PANDORA_WITH_PYTHON3], [
++
++  AC_REQUIRE([PANDORA_SWIG])
++
++  AC_ARG_WITH([python3], 
++    [AS_HELP_STRING([--with-python3],
++      [Build Python3 Bindings @<:@default=yes@:>@])],[
++        with_python3=$withval
++        python3_requested=$withval
++      ],[ 
++        with_python3=yes
++        python3_requested=no
++      ])
++
++  AS_IF([test "x$ac_cv_swig_has_python3_" != "xyes"],[
++     with_python3=no
++  ],[
++   AS_IF([test "x$with_python3" != "xno"],[
++     AS_IF([test "x$with_python3" != "xyes"],
++       [PYTHON3=$with_python3],[
++        AC_PATH_PROG([PYTHON3],[python3],[no])
++        PANDORA_PYTHON3_DEVEL()
++        AS_IF([test "x$python3exists" = "xno"],[with_python="no"])
++     ]) 
++   ])
++  ])
++  AS_IF([test "x$with_python3" = "xno" -a "$python3_requested" = "yes"],[
++    AC_MSG_ERROR([Python3 support was explicity requested, but Python3 support
++                  was not found. Please correct your build environment and try
++                  again])
++  ])
++  AM_CONDITIONAL(BUILD_PYTHON3, [test "$with_python3" = "yes"])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_drizzle_build.m4
+@@ -0,0 +1,110 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++dnl Check for all of the headers and libs that Drizzle needs. We check all
++dnl of these for plugins too, to ensure that all of the appropriate defines
++dnl are set.
++
++AC_DEFUN([PANDORA_DRIZZLE_BUILD],[
++
++  dnl We need to turn on our CXXFLAGS to make sure it shows up correctly
++  PANDORA_CXX_STL_HASH
++
++  PANDORA_CXX_CSTDINT
++  PANDORA_CXX_CINTTYPES
++
++  AC_STRUCT_TM
++
++  AC_FUNC_ALLOCA
++  AC_FUNC_UTIME_NULL
++  AC_FUNC_VPRINTF
++
++  PANDORA_WORKING_FDATASYNC
++
++  AC_CHECK_FUNCS(\
++    gethrtime \
++    setupterm \
++    backtrace \
++    backtrace_symbols \
++    backtrace_symbols_fd)
++
++  AC_HEADER_STAT
++  AC_HEADER_DIRENT
++  AC_HEADER_STDC
++  AC_HEADER_SYS_WAIT
++  AC_HEADER_STDBOOL
++
++  AC_CHECK_HEADERS(sys/types.h sys/fpu.h fpu_control.h ieeefp.h)
++  AC_CHECK_HEADERS(select.h sys/select.h)
++  AC_CHECK_HEADERS(utime.h sys/utime.h )
++  AC_CHECK_HEADERS(synch.h sys/mman.h sys/socket.h)
++  AC_CHECK_HEADERS(sched.h)
++  AC_CHECK_HEADERS(sys/prctl.h)
++  AC_CHECK_HEADERS(execinfo.h)
++  AC_CHECK_HEADERS(locale.h)
++  AC_CHECK_HEADERS(termcap.h termio.h termios.h asm/termbits.h)
++  AC_CHECK_HEADERS(paths.h)
++
++  
++  #--------------------------------------------------------------------
++  # Check for system libraries. Adds the library to $LIBS
++  # and defines HAVE_LIBM etc
++  #--------------------------------------------------------------------
++  
++    # For the sched_yield() function on Solaris
++  AC_CHECK_FUNC(sched_yield, [],
++    [AC_CHECK_LIB(posix4, [sched_yield],
++      [AC_DEFINE(HAVE_SCHED_YIELD, 1, [Have sched_yield function]) LIBS="$LIBS -lposix4"])])
++  
++  AS_IF([test "$ac_cv_header_termio_h" = "no" -a "$ac_cv_header_termios_h" = "no"],[
++    AC_CHECK_FUNC(gtty, [], [AC_CHECK_LIB(compat, gtty)])
++  ])
++  
++  AC_CHECK_HEADERS([curses.h term.h],[],[],[[
++    #ifdef HAVE_CURSES_H
++    # include <curses.h>
++    #endif
++  ]])
++  AC_CHECK_TYPES([uint, ulong])
++
++  PANDORA_CXX_DEMANGLE
++
++  AH_TOP([
++#ifndef __CONFIG_H__
++#define __CONFIG_H__
++
++#include "config/top.h"
++])
++  mkdir -p config
++  cat > config/top.h.stamp <<EOF_CONFIG_TOP
++
++#if defined(i386) && !defined(__i386__)
++#define __i386__
++#endif
++
++#if defined(_FILE_OFFSET_BITS)
++# undef _FILE_OFFSET_BITS
++#endif
++EOF_CONFIG_TOP
++  diff config/top.h.stamp config/top.h >/dev/null 2>&1 || mv config/top.h.stamp config/top.h
++  rm -f config/top.h.stamp
++
++
++  AH_BOTTOM([
++#if defined(__cplusplus)
++# include CSTDINT_H
++# include CINTTYPES_H
++#else
++# include <stdint.h>
++# include <inttypes.h>
++#endif
++
++#if !defined(HAVE_ULONG) && !defined(__USE_MISC)
++typedef unsigned long int ulong;
++#endif
++
++#endif /* __CONFIG_H__ */
++  ])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libdrizzle.m4
+@@ -0,0 +1,55 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBDRIZZLE],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libdrizzle
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libdrizzle],
++    [AS_HELP_STRING([--disable-libdrizzle],
++      [Build with libdrizzle support @<:@default=on@:>@])],
++    [ac_enable_libdrizzle="$enableval"],
++    [ac_enable_libdrizzle="yes"])
++
++  AS_IF([test "x$ac_enable_libdrizzle" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(drizzle,,[
++      #include <libdrizzle/drizzle_client.h>
++    ],[
++      drizzle_st drizzle;
++      drizzle_version();
++    ])
++  ],[
++    ac_cv_libdrizzle="no"
++  ])
++  
++  AM_CONDITIONAL(HAVE_LIBDRIZZLE, [test "x${ac_cv_libdrizzle}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBDRIZZLE],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBDRIZZLE])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBDRIZZLE],[
++  AC_REQUIRE([PANDORA_HAVE_LIBDRIZZLE])
++  AS_IF([test "x${ac_cv_libdrizzle}" = "xno"],
++      AC_MSG_ERROR([libdrizzle is required for ${PACKAGE}]))
++])
++
++AC_DEFUN([PANDORA_LIBDRIZZLE_NOVCOL],[
++  AC_CACHE_CHECK([if libdrizzle still has virtual columns],
++    [pandora_cv_libdrizzle_vcol],
++    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++#include <libdrizzle/drizzle.h>
++int foo= DRIZZLE_COLUMN_TYPE_DRIZZLE_VIRTUAL;
++    ]])],
++    [pandora_cv_libdrizzle_vcol=yes],
++    [pandora_cv_libdrizzle_vcol=no])])
++  AS_IF([test "$pandora_cv_libdrizzle_vcol" = "yes"],[
++    AC_MSG_ERROR([Your version of libdrizzle is too old. ${PACKAGE} requires at least version 0.4])
++  ])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libtokyocabinet.m4
+@@ -0,0 +1,52 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++ 
++dnl Provides support for finding libtokyocabinet.
++dnl LIBTOKYOCABINET_CFLAGS will be set, in addition to LIBTOKYOCABINET and LTLIBTOKYOCABINET
++
++AC_DEFUN([_PANDORA_SEARCH_LIBTOKYOCABINET],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libtokyocabinet
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libtokyocabinet],
++    [AS_HELP_STRING([--disable-libtokyocabinet],
++      [Build with libtokyocabinet support @<:@default=on@:>@])],
++    [ac_enable_libtokyocabinet="$enableval"],
++    [ac_enable_libtokyocabinet="yes"])
++
++  AS_IF([test "x$ac_enable_libtokyocabinet" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(tokyocabinet,,[
++#include <tcutil.h>
++    ],[
++const char *test= tcversion;
++    ])
++  ],[
++    ac_cv_libtokyocabinet="no"
++  ])
++
++  AS_IF([test "${ac_cv_libtokyocabinet}" = "no" -a "${ac_enable_libtokyocabinet}" = "yes"],[
++
++    PKG_CHECK_MODULES([LIBTOKYOCABINET], [libtokyocabinet], [
++      ac_cv_libtokyocabinet=yes
++      LTLIBTOKYOCABINET=${LIBTOKYOCABINET_LIBS}
++      LIBTOKYOCABINET=${LIBTOKYOCABINET_LIBS}
++    ],[])
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBTOKYOCABINET, [test "${ac_cv_libtokyocabinet}" = "yes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBTOKYOCABINET],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBTOKYOCABINET])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBTOKYOCABINET],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBTOKYOCABINET])
++  AS_IF([test "x${ac_cv_libtokyocabinet}" = "xno"],
++    AC_MSG_ERROR([libtokyocabinet is required for ${PACKAGE}. On Debian systems this is found in libtokyocabinet-dev. On RedHat, in tokyocabinet-devel.]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libsqlite3.m4
+@@ -0,0 +1,42 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBSQLITE3],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for libsqlite3
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libsqlite3],
++    [AS_HELP_STRING([--disable-libsqlite3],
++      [Build with libsqlite3 support @<:@default=on@:>@])],
++    [ac_enable_libsqlite3="$enableval"],
++    [ac_enable_libsqlite3="yes"])
++
++  AS_IF([test "x$ac_enable_libsqlite3" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(sqlite3,,[
++      #include <stdio.h>
++      #include <sqlite3.h>
++    ],[
++      sqlite3 *db;
++      sqlite3_open(NULL, &db);
++    ])
++  ],[
++    ac_cv_libsqlite3="no"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBSQLITE3, [test "x${ac_cv_libsqlite3}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBSQLITE3],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBSQLITE3])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBSQLITE3],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBSQLITE3])
++  AS_IF([test "x${ac_cv_libsqlite3}" = "xno"],
++    AC_MSG_ERROR([libsqlite3 is required for ${PACKAGE}]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_memcached.m4
+@@ -0,0 +1,41 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_MEMCACHED],[
++
++  AC_ARG_WITH([memcached],
++    [AS_HELP_STRING([--with-memcached],
++      [Memcached binary to use for make test])],
++    [ac_cv_with_memcached="$withval"],
++    [ac_cv_with_memcached=memcached])
++
++  # just ignore the user if --without-memcached is passed.. it is
++  # only used by make test
++  AS_IF([test "x$ac_cv_with_memcached" = "xno"],[
++    ac_cv_with_memcached=memcached
++    MEMCACHED_BINARY=memcached
++  ],[
++    AS_IF([test -f "$ac_cv_with_memcached"],[
++      MEMCACHED_BINARY=$ac_cv_with_memcached
++    ],[
++      AC_PATH_PROG([MEMCACHED_BINARY], [$ac_cv_with_memcached], "no")
++    ])
++  ])
++  AC_DEFINE_UNQUOTED([MEMCACHED_BINARY], "$MEMCACHED_BINARY", 
++            [Name of the memcached binary used in make test])
++  AM_CONDITIONAL([HAVE_MEMCACHED],[test "x$MEMCACHED_BINARY" != "xno"])
++])
++
++AC_DEFUN([PANDORA_HAVE_MEMCACHED],[
++  AC_REQUIRE([_PANDORA_SEARCH_MEMCACHED])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_MEMCACHED],[
++  AC_REQUIRE([PANDORA_HAVE_MEMCACHED])
++  AS_IF([test "x$MEMCACHED_BINARY" = "xno"],[
++    AC_MSG_ERROR(["could not find memcached binary"])
++  ])
++])
++
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libbdb.m4
+@@ -0,0 +1,40 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++AC_DEFUN([_PANDORA_SEARCH_LIBBDB],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  dnl --------------------------------------------------------------------
++  dnl  Check for bekerely db
++  dnl --------------------------------------------------------------------
++
++  AC_ARG_ENABLE([libbdb],
++    [AS_HELP_STRING([--disable-libbdb],
++      [Build with libbdb support @<:@default=on@:>@])],
++    [ac_enable_libbdb="$enableval"],
++    [ac_enable_libbdb="yes"])
++
++  AS_IF([test "x$ac_enable_libbdb" = "xyes"],[
++    AC_LIB_HAVE_LINKFLAGS(db,,[
++      #include <db.h>
++    ],[
++      const char *test= DB_VERSION_STRING;
++    ])
++  ],[
++    ac_cv_libbdb="no"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBBDB, [test "x${ac_cv_libbdb}" = "xyes"])
++])
++
++AC_DEFUN([PANDORA_HAVE_LIBBDB],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBBDB])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBBDB],[
++  AC_REQUIRE([_PANDORA_SEARCH_LIBBDB])
++  AS_IF([test "x${ac_cv_libbdb}" = "xno"],
++    AC_MSG_ERROR([libbdb is required for ${PACKAGE}]))
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_have_libpcre.m4
+@@ -0,0 +1,73 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++#--------------------------------------------------------------------
++# Check for libpcre
++#--------------------------------------------------------------------
++
++
++AC_DEFUN([_PANDORA_SEARCH_LIBPCRE],[
++  AC_REQUIRE([AC_LIB_PREFIX])
++
++  AC_LIB_HAVE_LINKFLAGS(pcre,,
++  [#include <pcre.h>],
++  [
++    pcre *re= NULL;
++    pcre_version();
++  ])
++  AS_IF([test "x$ac_cv_libpcre" = "xno"],
++  [
++    unset ac_cv_libpcre
++    unset HAVE_LIBPCRE
++    unset LIBPCRE
++    unset LIBPCRE_PREFIX
++    unset LTLIBPCRE
++    AC_LIB_HAVE_LINKFLAGS(pcre,,
++    [#include <pcre/pcre.h>],
++    [
++      pcre *re= NULL;
++      pcre_version();
++    ])
++    AS_IF([test "x$ac_cv_libpcre" = "xyes"], [
++      ac_cv_pcre_location="<pcre/pcre.h>"
++    ])
++  ],[
++    ac_cv_pcre_location="<pcre.h>"
++  ])
++
++  AM_CONDITIONAL(HAVE_LIBPCRE, [test "x${ac_cv_libpcre}" = "xyes"])
++])
++
++AC_DEFUN([_PANDORA_HAVE_LIBPCRE],[
++
++  AC_ARG_ENABLE([libpcre],
++    [AS_HELP_STRING([--disable-libpcre],
++      [Build with libpcre support @<:@default=on@:>@])],
++    [ac_enable_libpcre="$enableval"],
++    [ac_enable_libpcre="yes"])
++
++  _PANDORA_SEARCH_LIBPCRE
++])
++
++
++AC_DEFUN([PANDORA_HAVE_LIBPCRE],[
++  AC_REQUIRE([_PANDORA_HAVE_LIBPCRE])
++])
++
++AC_DEFUN([_PANDORA_REQUIRE_LIBPCRE],[
++  ac_enable_libpcre="yes"
++  _PANDORA_SEARCH_LIBPCRE
++
++  AS_IF([test x$ac_cv_libpcre = xno],[
++    AC_MSG_ERROR([libpcre is required for ${PACKAGE}. On Debian this can be found in libpcre3-dev. On RedHat this can be found in pcre-devel.])
++  ],[
++    AC_DEFINE_UNQUOTED(PCRE_HEADER,[${ac_cv_pcre_location}],
++                       [Location of pcre header])
++  ])
++])
++
++AC_DEFUN([PANDORA_REQUIRE_LIBPCRE],[
++  AC_REQUIRE([_PANDORA_REQUIRE_LIBPCRE])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_cstdint.m4
+@@ -0,0 +1,33 @@
++# We check two things: where the include file is for cstdint. We
++# include AC_TRY_COMPILE for all the combinations we've seen in the
++# wild.  We define one of HAVE_CSTDINT or HAVE_TR1_CSTDINT or 
++# HAVE_BOOST_CSTDINT depending
++# on location.
++
++AC_DEFUN([PANDORA_CXX_CSTDINT],
++  [AC_MSG_CHECKING(the location of cstdint)
++   AC_LANG_PUSH(C++)
++   save_CXXFLAGS="${CXXFLAGS}"
++   CXXFLAGS="${CXX_STANDARD} ${CXXFLAGS}"
++   ac_cv_cxx_cstdint=""
++   for location in tr1/cstdint boost/cstdint cstdint; do
++     if test -z "$ac_cv_cxx_cstdint"; then
++       AC_TRY_COMPILE([#include <$location>],
++                      [uint32_t t],
++                      [ac_cv_cxx_cstdint="<$location>";])
++     fi
++   done
++   AC_LANG_POP()
++   CXXFLAGS="${save_CXXFLAGS}"
++   if test -n "$ac_cv_cxx_cstdint"; then
++      AC_MSG_RESULT([$ac_cv_cxx_cstdint])
++   else
++      AC_DEFINE([__STDC_CONSTANT_MACROS],[1],[Use STDC Constant Macros in C++])
++      AC_DEFINE([__STDC_FORMAT_MACROS],[1],[Use STDC Format Macros in C++])
++      ac_cv_cxx_cstdint="<stdint.h>"
++      AC_MSG_RESULT()
++      AC_MSG_WARN([Could not find a cstdint header.])
++   fi
++   AC_DEFINE_UNQUOTED(CSTDINT_H,$ac_cv_cxx_cstdint,
++                      [the location of <cstdint>])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_python.m4
+@@ -0,0 +1,37 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++
++AC_DEFUN([PANDORA_WITH_PYTHON], [
++
++  AC_ARG_WITH([python], 
++    [AS_HELP_STRING([--with-python],
++      [Build Python Bindings @<:@default=yes@:>@])],
++    [with_python=$withval
++     python_requested=$withval
++    ], 
++    [with_python=yes
++     python_requested=no
++    ])
++
++  AS_IF([test "x$with_python" != "xno"],[
++    AS_IF([test "x$with_python" != "xyes"],[PYTHON=$with_python])
++    AM_PATH_PYTHON([2.4],,[with_python="no"])
++    AC_PYTHON_DEVEL()
++    AS_IF([test "x$pythonexists" = "xno"],[with_python="no"])
++  ])
++  AS_IF([test "x$with_python" = "xno" -a "$python_requested" = "yes"],[
++    AC_MSG_ERROR([Python support was explicity requested, but Python support
++                  was not found. Please correct your build environment and try
++                  again])
++  ])
++  AM_CONDITIONAL(BUILD_PYTHON, [test "$with_python" = "yes"])
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_with_ruby.m4
+@@ -0,0 +1,79 @@
++dnl -*- mode: m4; c-basic-offset: 2; indent-tabs-mode: nil; -*-
++dnl vim:expandtab:shiftwidth=2:tabstop=2:smarttab:
++dnl   
++dnl pandora-build: A pedantic build system
++dnl Copyright (C) 2009 Sun Microsystems, Inc.
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++dnl
++dnl From Monty Taylor
++
++
++AC_DEFUN([PANDORA_WITH_RUBY], [
++
++  AC_ARG_WITH([ruby],
++    [AS_HELP_STRING([--with-ruby],
++      [Build Ruby Bindings @<:@default=yes@:>@])],
++      [with_ruby=$withval],
++      [with_ruby=ruby])
++
++  AS_IF([test "x$with_ruby" != "xno"],[
++    AS_IF([test "x$with_ruby" != "xyes"],
++      [ac_chk_ruby=$with_ruby],
++      [ac_chk_ruby=ruby1.8 ruby])
++    AC_CHECK_PROGS(RUBY,$ac_chk_ruby)
++  ])
++
++  AS_IF([test "x$RUBY" != "x"],[
++
++    AC_MSG_CHECKING(for ruby devel)
++
++    dnl need to change quotes to allow square brackets
++    changequote(<<, >>)dnl
++    ruby_prefix=`$RUBY -rrbconfig -e "print Config::CONFIG['archdir']"`
++    strip_ruby_prefix=`$RUBY -rrbconfig -e "print Config::CONFIG['prefix']" | sed 's/\//./g'`
++    
++    RUBY_LIB=`$RUBY -rrbconfig -e "puts Config::CONFIG['ruby_install_name']"`
++    LIBRUBYARG_SHARED=`$RUBY -rrbconfig -e "puts Config::CONFIG['LIBRUBYARG_SHARED']"`
++    RUBY_DIR=`$RUBY -rrbconfig -e "puts Config::CONFIG['archdir']"`
++    RUBY_ARCH_DIR=`echo $RUBY_DIR | sed "s/$strip_ruby_prefix//"`
++    RUBY_LIBDIR=`$RUBY -rrbconfig -e "puts Config::CONFIG['rubylibdir']"`
++    RUBY_INCLUDES="-I$ruby_prefix"
++    changequote([, ])dnl
++
++    ac_save_CFLAGS="$CFLAGS"
++    ac_save_CPPFLAGS="$CPPFLAGS"
++    ac_save_LDFLAGS="$LDFLAGS"
++    CFLAGS="$ac_save_CFLAGS $RUBY_INCLUDES"
++    CPPFLAGS="$ac_save_CPPFLAGS $RUBY_INCLUDES"
++    LDFLAGS="$ac_save_LDFLAGS $LIBRUBYARG_SHARED"
++    
++    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <ruby.h>]], [[VALUE rb_ac_test = rb_define_module("actest");]])],[with_ruby="yes";AC_MSG_RESULT(found)],[with_ruby="no";AC_MSG_RESULT(missing)])
++
++    CPPFLAGS="$ac_save_CPPFLAGS"
++    CFLAGS="$ac_save_CFLAGS"
++    LDFLAGS="$ac_save_LDFLAGS"
++  ],[
++    # This allows 'make clean' in the ruby directory to work when
++    # ruby isn't available
++    RUBY=
++    RUBY_INCLUDES=
++    LIBRUBYARG_SHARED=
++    RUBY_LIB=
++    RUBY_DIR=
++    RUBY_LIBDIR=
++    RUBY_ARCH_DIR=
++    with_ruby="no"
++  ])
++
++  AC_SUBST(RUBY_INCLUDES)
++  AC_SUBST(LIBRUBYARG_SHARED)
++  AC_SUBST(RUBY_LIB)
++  AC_SUBST(RUBY_DIR)
++  AC_SUBST(RUBY_LIBDIR)
++  AC_SUBST(RUBY_ARCH_DIR)
++
++  AS_IF([test "x$RUBY_DIR" = "x"],[with_ruby="no"])
++  AM_CONDITIONAL(BUILD_RUBY, test "$with_ruby" = "yes")
++])
+--- /dev/null
++++ libmemcached-0.38/m4/pandora_fdatasync.m4
+@@ -0,0 +1,25 @@
++dnl  Copyright (C) 2009 Sun Microsystems
++dnl This file is free software; Sun Microsystems
++dnl gives unlimited permission to copy and/or distribute it,
++dnl with or without modifications, as long as this notice is preserved.
++
++#--------------------------------------------------------------------
++# Check for a working fdatasync call
++#--------------------------------------------------------------------
++
++
++AC_DEFUN([PANDORA_WORKING_FDATASYNC],[
++  AC_CACHE_CHECK([working fdatasync],[ac_cv_func_fdatasync],[
++    AC_LANG_PUSH(C++)
++    AC_RUN_IFELSE([AC_LANG_PROGRAM([[
++#include <unistd.h>
++      ]],[[
++fdatasync(4);
++      ]])],
++    [ac_cv_func_fdatasync=yes],
++    [ac_cv_func_fdatasync=no])
++    AC_LANG_POP()
++  ])
++  AS_IF([test "x${ac_cv_func_fdatasync}" = "xyes"],
++    [AC_DEFINE([HAVE_FDATASYNC],[1],[If the system has a working fdatasync])])
++])
+\ No newline at end of file

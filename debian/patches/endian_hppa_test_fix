@@ -1,0 +1,14 @@
+Skip the murmur test on all bigendian architectures, not just sparc.
+Index: new-trunk/tests/mem_functions.c
+===================================================================
+--- new-trunk.orig/tests/mem_functions.c	2010-02-11 12:19:56.366167355 -0800
++++ new-trunk/tests/mem_functions.c	2010-02-11 12:20:25.307392556 -0800
+@@ -5051,7 +5051,7 @@
+ 
+ static test_return_t murmur_run (memcached_st *memc __attribute__((unused)))
+ {
+-#ifdef __sparc
++#ifdef WORDS_BIGENDIAN
+   return TEST_SKIPPED;
+ #else
+   uint32_t x;

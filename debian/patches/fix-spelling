@@ -1,0 +1,14 @@
+Fix a spelling error in a manpage.
+Index: new-trunk/docs/memcat.pod
+===================================================================
+--- new-trunk.orig/docs/memcat.pod	2010-02-11 13:30:28.699514431 -0800
++++ new-trunk/docs/memcat.pod	2010-02-11 13:30:31.514245138 -0800
+@@ -8,7 +8,7 @@
+ 
+ =head1 DESCRIPTION
+ 
+-B<memcat> outputs to stdout the value a single or mutiple set of keys
++B<memcat> outputs to stdout the value a single or multiple set of keys
+ stored in a memcached(1) server. If any key is not found an error is returned.
+ 
+ It is similar to the standard UNIX cat(1) utility. 

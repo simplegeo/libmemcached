@@ -1,0 +1,94 @@
+libmemcached (0.38-1ubuntu1) unstable; urgency=low
+
+  * Ubuntuized.
+
+ -- Ian Eure <ian@simplegeo.com>  Tue, 18 May 2010 11:04:21 -0700
+
+libmemcached (0.38-1) unstable; urgency=low
+
+  * New upstream release.
+  * Switch to dpkg-source 3.0 (quilt) format
+  * Skip the murmur test on hppa (Closes: #569194) 
+  * Added spelling fix.
+
+ -- Monty Taylor <mordred@inaugust.com>  Thu, 11 Feb 2010 13:32:09 -0800
+
+libmemcached (0.37-2) unstable; urgency=low
+
+  * Added conflicts relationship on the new libmemcachedprotocol0 and
+    libmemcachedutil0 libraries with libmemcached3 so that upgrades
+    work. (Closes: #566734)
+  * Added build of and install of static libs. (Closes: #568087)
+  * New standards version 3.8.4. 
+
+ -- Monty Taylor <mordred@inaugust.com>  Sat, 06 Feb 2010 08:23:07 -0800
+
+libmemcached (0.37-1) unstable; urgency=low
+
+  * Removed memcached from Recommends (Closes: #552053)
+  * New upstream version. (Closes: #555543)
+  * Updated debian/copyright to include the various licenses of things.
+
+ -- Monty Taylor <mordred@inaugust.com>  Wed, 13 Jan 2010 02:55:22 -0800
+
+libmemcached (0.34-1) unstable; urgency=low
+
+  * New upstream version.
+  * Added the license for libmemcached/hsieh_hash.c to debian/copyright. 
+  * Changed tool renaming to memc prefix. 
+  * Re-enabled make test as memcached 1.4.1 is in the repo now. 
+  * Removed chrpath now that upstream tarballs are built with modern automake. 
+  * Added versioned debhelper depend to enable use of override rules. 
+
+ -- Monty Taylor <mordred@inaugust.com>  Tue, 13 Oct 2009 12:12:17 -0700
+
+libmemcached (0.33-1) unstable; urgency=low
+
+  * Fixed get-orig-source rules line.
+  * Rearranged control file just a little bit. 
+  * Removed dpatch requirement and patches from source.
+  * Standards Version 3.8.3 (no changes needed).
+  * New upstream version. 
+  * Library sover changed from 2 to 3.
+
+ -- Monty Taylor <mordred@inaugust.com>  Sun, 04 Oct 2009 11:01:49 -0700
+
+libmemcached (0.31-1) unstable; urgency=low
+
+  * New upstream release.
+  * Added dpkg-gensymbols support.
+  * Prevent debuild from overriding libmemcached CFLAGS.
+  * Fixed whatis entries on manpages.
+  * Standards Version 3.8.2 (no changes needed).
+
+ -- Monty Taylor <mordred@inaugust.com>  Thu, 16 Jul 2009 15:29:18 -0700
+
+libmemcached (0.30-2) unstable; urgency=low
+
+  * Renamed memdump to memdump.libmemcached (Closes: #532246)
+  * Fixed -dev depends: misspelling of word "Depends".
+
+ -- Monty Taylor <mordred@inaugust.com>  Tue, 16 Jun 2009 04:47:02 -0700
+
+libmemcached (0.30-1) unstable; urgency=low
+
+  * Fixed homepage field.
+  * Changed section of -tools to match override file.
+  * Fixed -dev depends: added depend on the lib itself.
+  * New upstream release.
+
+ -- Monty Taylor <mordred@inaugust.com>  Sun, 31 May 2009 22:54:15 -0700
+
+libmemcached (0.29-1) unstable; urgency=low
+
+  * New upstream version.
+  * Added -dbg package. (Closes: #529285)
+  * Added libmemcachedutil packages. 
+
+ -- Monty Taylor <mordred@inaugust.com>  Tue, 19 May 2009 01:09:28 -0700
+
+libmemcached (0.28-1) unstable; urgency=low
+
+  * Initial release (Closes: #468258)  
+
+ -- Monty Taylor <mordred@inaugust.com>  Mon, 11 May 2009 16:39:21 -0700

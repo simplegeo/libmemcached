@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+
+CFLAGS=
+CXXFLAGS=
+
+TMP=$(CURDIR)/debian/tmp/
+
+override_dh_auto_configure:
+	bash config/autorun.sh
+	dh_auto_configure -- --disable-rpath --enable-static
+
+build: build-stamp
+build-stamp:
+	dh build
+	touch build-stamp
+
+clean:
+	dh clean
+
+install: build install-stamp
+install-stamp:
+	dh --until auto_install install
+	# Run gensymbols
+	dpkg-gensymbols -c -plibmemcached4 -Idebian/libmemcached4.symbols -e${TMP}/usr/lib/libmemcached.so
+	dpkg-gensymbols -c -plibhashkit0 -Idebian/libhashkit0.symbols -e${TMP}/usr/lib/libhashkit.so
+	dpkg-gensymbols -c -plibmemcachedprotocol0 -Idebian/libmemcachedprotocol0.symbols -e${TMP}/usr/lib/libmemcachedprotocol.so
+	dpkg-gensymbols -c -plibmemcachedutil0 -Idebian/libmemcachedutil0.symbols -e${TMP}/usr/lib/libmemcachedutil.so
+	# Naming conflict: rename commandline programs
+	for memfile in $(TMP)/usr/bin/mem* $(TMP)/usr/share/man/man1/mem*.1 ; do \
+		mv $$memfile `echo $$memfile | sed 's/\bmem/memc/'` ; \
+	done
+	touch install-stamp
+
+
+binary-arch: install
+	dh binary-arch --before strip
+	dh_strip --dbg-package=libmemcached-dbg
+	dh binary-arch --after strip
+
+binary-indep: install
+	dh binary-indep
+
+binary: binary-arch binary-indep
+
+get-orig-source:
+	uscan --verbose --force-download --rename --repack --destdir=..

@@ -1,0 +1,157 @@
+Source: libmemcached
+Priority: extra
+Maintainer: Monty Taylor <mordred@inaugust.com>
+Build-Depends: debhelper (>= 7.0.50), perl, memcached (>= 1.4.1), automake (>= 1.10), autoconf, libtool
+Standards-Version: 3.8.4
+Section: libs
+Homepage: http://tangent.org/552/libmemcached.html
+Vcs-Browser: http://bazaar.launchpad.net/~libmemcached-developers/pkg-libmemcached/trunk/files
+Vcs-Bzr: http://bazaar.launchpad.net/~libmemcached-developers/pkg-libmemcached/trunk
+
+Package: libmemcached-dev
+Section: libdevel
+Architecture: any
+Depends:
+ libmemcached4 (= ${binary:Version}),
+ libhashkit0 (=${binary:Version}),
+ libmemcachedutil0 (= ${binary:Version}),
+ libmemcachedprotocol0 (= ${binary:Version}),
+ ${shlibs:Depends}, ${misc:Depends}
+Description: Development files for libmemcached
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ A few notes on its design:
+   * Synchronous and Asynchronous support.
+   * TCP and Unix Socket protocols.
+   * A half dozen or so different hash algorithms .
+   * Implementations of the new cas, replace, and append operators.
+   * Man pages written up on entire API.
+   * Implements both modulo and consistent hashing solutions.
+ .
+ This package provides development headers for libmemcached.
+ 
+Package: libmemcached-tools
+Architecture: any
+Section: utils
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Commandline tools for talking to memcached via libmemcached
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ This package provides several command line tools:
+ .
+   * memccat - Copy the value of a key to standard output
+   * memcflush - Flush the contents of your servers.
+   * memcrm - Remove a key(s) from the serrver.
+   * memccp - Copy files to a memached server.
+   * memcstat - Dump the stats of your servers to standard output
+   * memcslap - Generate testing loads on a memcached cluster 
+
+Package: libmemcached-dbg
+Section: debug
+Architecture: any
+Depends:
+ libmemcached4 (= ${binary:Version}),
+ libhashkit0 (=${binary:Version}),
+ libmemcachedutil0 (= ${binary:Version}),
+ libmemcachedprotocol0 (= ${binary:Version}),
+ ${shlibs:Depends}, ${misc:Depends}
+Description: Debug Symbols for libmemcached
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ A few notes on its design:
+ .
+   * Synchronous and Asynchronous support.
+   * TCP and Unix Socket protocols.
+   * A half dozen or so different hash algorithms .
+   * Implementations of the new cas, replace, and append operators.
+   * Man pages written up on entire API.
+   * Implements both modulo and consistent hashing solutions.
+ .
+ This package provides debug symbols.
+
+Package: libmemcached4
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libmemcached2, libmemcached3
+Description: A C and C++ client library to the memcached server
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ A few notes on its design:
+ .
+   * Synchronous and Asynchronous support.
+   * TCP and Unix Socket protocols.
+   * A half dozen or so different hash algorithms .
+   * Implementations of the new cas, replace, and append operators.
+   * Man pages written up on entire API.
+   * Implements both modulo and consistent hashing solutions.
+ .
+ This package provides the libmemcached shared library itself.
+
+Package: libmemcachedutil0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libmemcached2, libmemcached3
+Description: A library implementing connection pooling for libmemcached
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ A few notes on its design:
+ .
+   * Synchronous and Asynchronous support.
+   * TCP and Unix Socket protocols.
+   * A half dozen or so different hash algorithms .
+   * Implementations of the new cas, replace, and append operators.
+   * Man pages written up on entire API.
+   * Implements both modulo and consistent hashing solutions.
+ .
+ This package provides the libmemcachedutil library.
+
+Package: libmemcachedprotocol0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libmemcached2, libmemcached3
+Description: A library implementing the memcached protocol
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ A few notes on its design:
+ .
+   * Synchronous and Asynchronous support.
+   * TCP and Unix Socket protocols.
+   * A half dozen or so different hash algorithms .
+   * Implementations of the new cas, replace, and append operators.
+   * Man pages written up on entire API.
+   * Implements both modulo and consistent hashing solutions.
+ .
+ This package provides the libmemcachedprotocol shared library.
+
+Package: libhashkit0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libmemcached2, libmemcached3
+Description: The hashing functions and algorithms used by libmemcached
+ libmemcached is a C and C++ client library to the memcached server 
+ (http://danga.com/memcached). It has been designed to be light on 
+ memory usage, thread safe, and provide full access to server side methods.
+ .
+ A few notes on its design:
+ .
+   * Synchronous and Asynchronous support.
+   * TCP and Unix Socket protocols.
+   * A half dozen or so different hash algorithms .
+   * Implementations of the new cas, replace, and append operators.
+   * Man pages written up on entire API.
+   * Implements both modulo and consistent hashing solutions.
+ .
+ This package provides the libhashkit shared library.
+

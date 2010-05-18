@@ -1,0 +1,11 @@
+libmemcachedprotocol.so.0 libmemcachedprotocol0 #MINVER#
+ memcached_binary_protocol_get_callbacks@Base 0.34
+ memcached_binary_protocol_get_pedantic@Base 0.34
+ memcached_binary_protocol_get_raw_response_handler@Base 0.34
+ memcached_binary_protocol_set_callbacks@Base 0.34
+ memcached_binary_protocol_set_pedantic@Base 0.34
+ memcached_protocol_client_destroy@Base 0.34
+ memcached_protocol_client_work@Base 0.34
+ memcached_protocol_create_client@Base 0.34
+ memcached_protocol_create_instance@Base 0.34
+ memcached_protocol_destroy_instance@Base 0.34
