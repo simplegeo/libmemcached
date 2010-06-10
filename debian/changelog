@@ -1,3 +1,9 @@
+libmemcached (0.38-sg7) unstable; urgency=low
+
+  * Bump version.
+
+ -- Ian Eure <ian@simplegeo.com>  Thu, 10 Jun 2010 12:51:01 -0700
+
 libmemcached (0.38-1ubuntu1) unstable; urgency=low
 
   * Ubuntuized.
