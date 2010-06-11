@@ -1,3 +1,9 @@
+libmemcached (0.38-1ubuntu2) unstable; urgency=low
+
+  * Change version back so it's greater than the previous one.
+
+ -- Ian Eure <ian@simplegeo.com>  Fri, 11 Jun 2010 10:00:14 -0700
+
 libmemcached (0.38-sg7) unstable; urgency=low
 
   * Bump version.
