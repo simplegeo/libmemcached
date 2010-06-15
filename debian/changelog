@@ -1,3 +1,9 @@
+libmemcached (0.38-1sg19) UNRELEASED; urgency=low
+
+  * UNRELEASED
+
+ -- SimpleGeo Nerds <nerds@simplegeo.com>  Tue, 15 Jun 2010 20:55:21 +0000
+
 libmemcached (0.38-1sg0) development; urgency=low
 
   * Flip back to 3.0 source format and sg versioning! Hilarious!
