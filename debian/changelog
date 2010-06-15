@@ -1,3 +1,9 @@
+libmemcached (0.38-1sg0) development; urgency=low
+
+  * Flip back to 3.0 source format and sg versioning! Hilarious!
+
+ -- Ian Eure <ian@simplegeo.com>  Tue, 15 Jun 2010 13:50:29 -0700
+
 libmemcached (0.38-1ubuntu3) unstable; urgency=low
 
   * Switch back to 1.0 source format, since quilt touches timestamps in
